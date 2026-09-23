@@ -5,6 +5,7 @@ import base64
 import shutil
 import subprocess
 import socket
+import webbrowser
 import requests
 from io import BytesIO
 from PIL import Image
@@ -15,7 +16,8 @@ from mutagen.mp3 import MP3
 
 # ----------------- متغیرهای سراسری برنامه -----------------
 APP_NAME = "AudioFlow Studio"
-APP_VERSION = "v.1.0.0"
+APP_VERSION = "v.1.1.0"
+GITHUB_REPO = "HadiDastangoo/AudioFlow-Studio"
 # --------------------------------------------------------
 
 def get_embedded_font_css():
@@ -50,7 +52,6 @@ class MusicTaggerAPI:
         self.current_file_path = None
         self.initial_tags = {}
         
-        # ذخیره فایل تنظیمات در کنار فایل اجرایی
         base_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         self.config_path = os.path.join(base_dir, "config.json")
 
@@ -63,7 +64,6 @@ class MusicTaggerAPI:
         self.load_settings_from_disk()
 
     def load_settings_from_disk(self):
-        """خواندن تنظیمات از دیسک"""
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
@@ -73,7 +73,6 @@ class MusicTaggerAPI:
                 pass
 
     def save_settings_to_disk(self):
-        """ذخیره تنظیمات روی فایل config.json"""
         try:
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
@@ -90,6 +89,61 @@ class MusicTaggerAPI:
         except OSError:
             return False
 
+    def open_external_url(self, url):
+        """باز کردن لینک دانلود یا گیتهاب در مرورگر اصلی سیستم کاربر"""
+        try:
+            webbrowser.open(url)
+            return {"status": "success"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def check_for_updates(self):
+        """بررسی آنلاین وجود نسخه جدیدتر در گیت‌هاب"""
+        if not self.is_online():
+            return {"status": "no_internet"}
+
+        try:
+            api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            headers = {"User-Agent": "AudioFlowStudio"}
+            resp = requests.get(api_url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                data = resp.json()
+                latest_tag = data.get("tag_name", "").strip()
+                html_url = data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases")
+                
+                # پیدا کردن لینک فایل .exe در Assets ریلیز گیت‌هاب
+                download_url = html_url
+                for asset in data.get("assets", []):
+                    if asset.get("name", "").endswith(".exe"):
+                        download_url = asset.get("browser_download_url", html_url)
+                        break
+
+                current_clean = APP_VERSION.lower().replace("v.", "").replace("v", "").strip()
+                latest_clean = latest_tag.lower().replace("v.", "").replace("v", "").strip()
+
+                def parse_ver(v_str):
+                    parts = []
+                    for seg in v_str.split("."):
+                        try:
+                            parts.append(int(seg))
+                        except ValueError:
+                            parts.append(0)
+                    return parts
+
+                has_update = parse_ver(latest_clean) > parse_ver(current_clean)
+
+                return {
+                    "status": "success",
+                    "has_update": has_update,
+                    "latest_version": latest_tag or f"v{latest_clean}",
+                    "current_version": APP_VERSION,
+                    "download_url": download_url,
+                    "release_notes": data.get("body", "")
+                }
+            return {"status": "error"}
+        except Exception:
+            return {"status": "error"}
+
     def select_file_dialog(self):
         dialog_type = getattr(webview.FileDialog, 'OPEN', webview.OPEN_DIALOG)
         result = self._window.create_file_dialog(
@@ -103,9 +157,7 @@ class MusicTaggerAPI:
 
     def select_folder_dialog(self):
         dialog_type = getattr(webview.FileDialog, 'FOLDER', webview.FOLDER_DIALOG)
-        result = self._window.create_file_dialog(
-            dialog_type
-        )
+        result = self._window.create_file_dialog(dialog_type)
         if result and len(result) > 0:
             self.settings["custom_output_dir"] = result[0]
             self.save_settings_to_disk()
@@ -141,11 +193,12 @@ class MusicTaggerAPI:
         return self.settings
 
     def process_selected_file(self, file_path):
-        if not os.path.exists(file_path):
+        if not file_path or not os.path.exists(file_path):
             return {"status": "error", "message": "File not found."}
 
         ext = os.path.splitext(file_path)[1].lower()
         self.current_file_path = file_path
+        filename = os.path.basename(file_path)
 
         if ext == ".mp3":
             tags_data = self._read_full_mp3_data(file_path)
@@ -154,6 +207,7 @@ class MusicTaggerAPI:
             return {
                 "status": "ready_mp3",
                 "file_path": file_path,
+                "filename": filename,
                 "tags": tags_data,
                 "audio_data": audio_base64
             }
@@ -161,7 +215,7 @@ class MusicTaggerAPI:
             return {
                 "status": "needs_conversion",
                 "file_path": file_path,
-                "filename": os.path.basename(file_path)
+                "filename": filename
             }
 
     def convert_to_mp3(self, file_path):
@@ -201,6 +255,7 @@ class MusicTaggerAPI:
             return {
                 "status": "success",
                 "file_path": output_path,
+                "filename": os.path.basename(output_path),
                 "tags": tags_data,
                 "audio_data": audio_base64
             }
@@ -292,6 +347,36 @@ class MusicTaggerAPI:
             return {"status": "no_internet"}
         except Exception:
             return {"status": "error", "results": []}
+
+    def fetch_lyrics(self, title, artist):
+        if not self.is_online():
+            return {"status": "no_internet"}
+
+        headers = {'User-Agent': 'AudioFlowStudio/1.1 (https://github.com)'}
+        try:
+            get_url = f"https://lrclib.net/api/get?track_name={requests.utils.quote(title)}&artist_name={requests.utils.quote(artist)}"
+            resp = requests.get(get_url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                data = resp.json()
+                lyrics = data.get("plainLyrics") or data.get("syncedLyrics")
+                if lyrics:
+                    return {"status": "success", "lyrics": lyrics}
+
+            search_url = f"https://lrclib.net/api/search?q={requests.utils.quote(f'{artist} {title}')}"
+            resp_search = requests.get(search_url, headers=headers, timeout=6)
+            if resp_search.status_code == 200:
+                items = resp_search.json()
+                if items and isinstance(items, list) and len(items) > 0:
+                    for it in items:
+                        lyrics = it.get("plainLyrics") or it.get("syncedLyrics")
+                        if lyrics:
+                            return {"status": "success", "lyrics": lyrics}
+
+            return {"status": "not_found"}
+        except requests.exceptions.RequestException:
+            return {"status": "no_internet"}
+        except Exception:
+            return {"status": "not_found"}
 
     def fetch_image_base64(self, url):
         if not self.is_online():
@@ -391,7 +476,7 @@ class MusicTaggerAPI:
             self.initial_tags = dict(tags)
             self.initial_tags["cover_base64"] = new_cover_base64
 
-            return {"status": "success", "new_path": target_path}
+            return {"status": "success", "new_path": target_path, "filename": os.path.basename(target_path)}
         except Exception as e:
             return {"status": "error", "message": f"Error saving: {str(e)}"}
 
@@ -409,6 +494,8 @@ UI_HTML = """
     --primary: #ff7700;
     --primary-light: #fff2e6;
     --primary-hover: #e56a00;
+    --accent-purple: #7952b3;
+    --accent-purple-light: #f3eefb;
     --bg-gradient: linear-gradient(135deg, #f8f9fa 0%, #edf1f5 100%);
     --glass-bg: rgba(255, 255, 255, 0.78);
     --glass-border: rgba(255, 255, 255, 0.95);
@@ -434,6 +521,7 @@ UI_HTML = """
     --border-color: rgba(255, 255, 255, 0.12);
     --modal-bg: #1e232b;
     --cover-bg: #16191f;
+    --accent-purple-light: rgba(121, 82, 179, 0.2);
   }
 
   html, body {
@@ -523,6 +611,7 @@ UI_HTML = """
   .header-actions { display: flex; gap: 10px; align-items: center; }
   
   .icon-btn {
+    position: relative;
     background: transparent;
     border: 1px solid var(--border-color);
     width: 38px;
@@ -536,6 +625,24 @@ UI_HTML = """
     transition: all 0.2s ease;
   }
   .icon-btn:hover, .icon-btn.active { border-color: var(--primary); color: var(--primary); background: var(--card-bg); }
+
+  /* نشانگر دایره قرمز برای اطلاع‌رسانی آپدیت */
+  .update-badge {
+    display: none;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 8px;
+    height: 8px;
+    background: #e63946;
+    border-radius: 50%;
+    border: 2px solid var(--glass-bg);
+    box-shadow: 0 0 6px rgba(230, 57, 70, 0.8);
+  }
+  [dir="rtl"] .update-badge {
+    right: auto;
+    left: 5px;
+  }
 
   .about-btn {
     background: transparent;
@@ -572,10 +679,35 @@ UI_HTML = """
   }
   .drop-zone:hover, .drop-zone.dragover {
     border-color: var(--primary);
-    background: rgba(255, 119, 0, 0.06);
+    background: rgba(255, 119, 0, 0.08);
     transform: translateY(-2px);
   }
   .drop-zone svg { stroke: var(--primary); stroke-width: 1.6; margin-bottom: 6px; }
+
+  .loaded-filename-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    padding: 10px 18px;
+    border-radius: 16px;
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(10px);
+  }
+  .loaded-filename-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .loaded-filename-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main);
+    user-select: text !important;
+    word-break: break-all;
+  }
 
   .conversion-banner {
     display: none;
@@ -691,6 +823,7 @@ UI_HTML = """
     font-size: 0.92rem;
     color: var(--text-main);
     transition: border-color 0.2s, box-shadow 0.2s;
+    user-select: text !important;
   }
   .form-control:focus {
     outline: none;
@@ -802,7 +935,7 @@ UI_HTML = """
   }
   .results-grid.view-grid .result-thumb {
     width: 100%;
-    height: 170px;
+    aspect-ratio: 1 / 1;
     border-radius: 12px;
     object-fit: cover;
   }
@@ -830,8 +963,9 @@ UI_HTML = """
     border-color: var(--primary);
   }
   .results-grid.view-list .result-thumb {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
+    aspect-ratio: 1 / 1;
     border-radius: 10px;
     object-fit: cover;
   }
@@ -840,6 +974,7 @@ UI_HTML = """
   }
   .results-grid.view-list .result-buttons {
     flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .result-details h4 {
@@ -872,6 +1007,11 @@ UI_HTML = """
     border: 1px solid var(--border-color);
     background: var(--card-bg);
     color: var(--text-main);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.15s ease;
   }
   .btn-sm:hover {
     border-color: var(--primary);
@@ -883,6 +1023,16 @@ UI_HTML = """
     border-color: var(--primary);
     color: var(--primary);
     font-weight: 600;
+  }
+  .btn-sm.btn-lyrics {
+    background: var(--accent-purple-light);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+    font-weight: 600;
+  }
+  .btn-sm.btn-lyrics:hover {
+    background: var(--accent-purple);
+    color: #fff;
   }
 
   .modal-backdrop {
@@ -919,12 +1069,8 @@ UI_HTML = """
     overflow: hidden;
     position: relative;
   }
-  .crop-offline-box canvas {
-    cursor: grab;
-  }
-  .crop-offline-box canvas:active {
-    cursor: grabbing;
-  }
+  .crop-offline-box canvas { cursor: grab; }
+  .crop-offline-box canvas:active { cursor: grabbing; }
   .crop-controls {
     display: flex;
     align-items: center;
@@ -949,6 +1095,7 @@ UI_HTML = """
     position: relative;
     width: 200px;
     height: 200px;
+    aspect-ratio: 1 / 1;
     border-radius: 16px;
     overflow: hidden;
     cursor: pointer;
@@ -1016,6 +1163,7 @@ UI_HTML = """
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    user-select: text !important;
   }
   .copy-btn {
     background: transparent;
@@ -1024,10 +1172,27 @@ UI_HTML = """
     color: var(--text-muted);
     display: flex;
     align-items: center;
-    padding: 4px;
+    justify-content: center;
+    padding: 6px;
     border-radius: 6px;
+    transition: all 0.2s;
   }
-  .copy-btn:hover { color: var(--primary); }
+  .copy-btn:hover { color: var(--primary); background: rgba(255, 119, 0, 0.1); }
+  .copy-btn.copied { color: #28a745 !important; }
+
+  .lyrics-content-box {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 16px 20px;
+    max-height: 360px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.8;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    user-select: text !important;
+  }
 
   .lightbox-modal {
     display: none;
@@ -1068,6 +1233,56 @@ UI_HTML = """
     accent-color: var(--primary);
   }
 
+  /* نوار اعلان آپدیت در تنظیمات */
+  .update-section-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--input-bg);
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+  }
+  .update-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .update-info-text {
+    font-size: 0.88rem;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .update-last-checked {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+  }
+  .update-found-banner {
+    display: none;
+    background: var(--primary-light);
+    border: 1px solid rgba(255, 119, 0, 0.35);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    color: var(--primary-hover);
+    justify-content: space-between;
+    align-items: center;
+  }
+  .btn-download-update {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn-download-update:hover { background: var(--primary-hover); }
+
   .toast {
     position: fixed;
     bottom: 24px;
@@ -1100,8 +1315,9 @@ UI_HTML = """
     </div>
     
     <div class="header-actions">
-      <button class="icon-btn" title="Settings" onclick="openSettingsModal()">
+      <button class="icon-btn" id="btnSettingsIcon" title="Settings" onclick="openSettingsModal()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span class="update-badge" id="settingsUpdateBadge"></span>
       </button>
       <button class="about-btn" onclick="openAboutModal()" data-i18n="btnAbout">About</button>
     </div>
@@ -1112,6 +1328,18 @@ UI_HTML = """
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
       <div style="font-weight: 600; font-size: 1.05rem;" data-i18n="dropText">Drop audio or video files here (MP4, MP3, ...) or browse</div>
       <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;" data-i18n="dropSubtext">Automatic online search, modern tag editor and full media player</div>
+    </div>
+
+    <!-- نوار نام فایل در حال ویرایش با قابلیت کپی مستقیم -->
+    <div class="loaded-filename-bar" id="loadedFilenameBar">
+      <div class="loaded-filename-inner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span style="font-size: 0.85rem; color: var(--text-muted);" data-i18n="lblCurrentFile">Current File:</span>
+        <span class="loaded-filename-text" id="displayLoadedFilename">---</span>
+      </div>
+      <button class="copy-btn" id="btnCopyFilename" title="Copy Filename" onclick="copyCurrentFilename(this)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      </button>
     </div>
 
     <div class="conversion-banner" id="conversionBanner">
@@ -1240,6 +1468,7 @@ UI_HTML = """
     </div>
   </div>
 
+  <!-- مدال جزئیات انتشار آهنگ -->
   <div class="modal-backdrop" id="detailModal">
     <div class="modal-dialog">
       <h3 style="font-weight: 700; font-size: 1.15rem;" data-i18n="detailsTitle">Release Details</h3>
@@ -1265,14 +1494,32 @@ UI_HTML = """
     </div>
   </div>
 
+  <!-- مدال متن ترانه (Lyrics) -->
+  <div class="modal-backdrop" id="lyricsModal">
+    <div class="modal-dialog" style="width: 620px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-weight: 700; font-size: 1.15rem; color: var(--accent-purple);" id="lyricsModalTitle">Song Lyrics</h3>
+        <button class="icon-btn" id="btnCopyAllLyrics" title="Copy Lyrics" onclick="copyLyricsText(this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+      </div>
+      <div class="lyrics-content-box" id="lyricsContentBox"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+        <button class="btn btn-outline" onclick="applyLyricsToComment()" data-i18n="btnApplyLyricsToComment">Set as Track Comment</button>
+        <button class="btn btn-primary" onclick="closeLyricsModal()" data-i18n="btnClose">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="lightbox-modal" id="lightboxModal" onclick="closeLightbox()">
     <img id="lightboxImg" src="" alt="Enlarged Cover">
   </div>
 
+  <!-- مدال تنظیمات با دکمه‌های بررسی آپدیت و انصراف -->
   <div class="modal-backdrop" id="settingsModal">
     <div class="modal-dialog">
       <h3 style="font-weight: 700; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         <span data-i18n="settingsTitle">Preferences & Storage</span>
       </h3>
 
@@ -1309,7 +1556,31 @@ UI_HTML = """
         </div>
       </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+      <!-- بخش آپدیت و بررسی نسخه -->
+      <div class="update-section-box">
+        <div class="update-status-row">
+          <div class="update-info-text">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span data-i18n="lblAppUpdate">Software Update:</span>
+            <span style="font-weight: 600;" id="txtCurrentVersion">__APP_VERSION__</span>
+          </div>
+          <button class="btn btn-sm btn-outline" id="btnManualCheckUpdate" onclick="manualCheckForUpdates()">
+            <span data-i18n="btnCheckUpdate">Check for Updates</span>
+          </button>
+        </div>
+        <div class="update-last-checked" id="txtLastCheckedTime">Last checked: Never</div>
+        
+        <div class="update-found-banner" id="updateFoundBanner">
+          <div>
+            <strong id="updateFoundTitle">New version available!</strong>
+            <div style="font-size: 0.78rem; opacity: 0.85;" id="updateFoundSub">Download the latest release from GitHub</div>
+          </div>
+          <button class="btn-download-update" id="btnDownloadUpdate" onclick="downloadLatestRelease()" data-i18n="btnDownload">Download</button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+        <button class="btn btn-outline" onclick="closeSettingsModal()" data-i18n="btnCancel">Cancel</button>
         <button class="btn btn-primary" onclick="saveSettingsModal()" data-i18n="btnSaveAndClose">Save & Apply</button>
       </div>
     </div>
@@ -1358,7 +1629,7 @@ UI_HTML = """
       </p>
       <div style="background: var(--primary-light); padding: 14px; border-radius: 12px;">
         <span style="font-weight: 600; color: var(--primary); font-size: 1.05rem;" data-i18n="aboutDev">Developer: Hadi Dastangoo</span>
-        <div style="font-size: 0.8rem; color: #888; margin-top: 4px;">Crafted with Python & modern vibe code</div>
+        <div style="font-size: 0.8rem; color: #888; margin-top: 4px;">AI Programming Partner: Google Gemini</div>
       </div>
       <button class="btn btn-outline" style="align-self: center; margin-top: 6px;" onclick="closeAboutModal()" data-i18n="btnClose">Close</button>
     </div>
@@ -1372,6 +1643,9 @@ UI_HTML = """
     let isModified = false;
     let cachedInitialTags = null;
     let currentSelectedDetailItem = null;
+    let cachedFetchedLyrics = "";
+    let latestDownloadUrl = "";
+    let lastCheckedTimestamp = null;
 
     let cropImg = new Image();
     let cropScale = 1;
@@ -1385,6 +1659,7 @@ UI_HTML = """
         btnAbout: "About",
         dropText: "Drop audio or video files here (MP4, MP3, ...) or browse",
         dropSubtext: "Automatic online search, modern tag editor and full media player",
+        lblCurrentFile: "Current File:",
         nonMp3Notice: "This is not an MP3 file; convert to MP3 to edit tags.",
         btnConvert: "Convert to MP3",
         chooseCover: "Choose Album Cover",
@@ -1429,12 +1704,26 @@ UI_HTML = """
         applyTags: "Set Tags",
         applyCover: "Set Cover",
         applyAll: "Set Tags & Cover",
+        viewLyrics: "Lyrics",
+        btnApplyLyricsToComment: "Set as Track Comment",
+        lyricsTitle: "Lyrics",
+        noLyricsFound: "No lyrics found for this track online.",
+        fetchingLyrics: "Fetching lyrics...",
+        lblAppUpdate: "Software Update:",
+        btnCheckUpdate: "Check for Updates",
+        checkingUpdate: "Checking...",
+        updateAvailable: "New version available!",
+        updateLatest: "You are using the latest version.",
+        btnDownload: "Download",
+        lastCheckedNever: "Last checked: Never",
+        lastCheckedPrefix: "Last checked: ",
         noInternet: "Unable to connect to the internet. Please check your network connection."
       },
       fa: {
         btnAbout: "درباره برنامه",
         dropText: "فایل صوتی یا تصویری (MP4, MP3, ...) را اینجا بکشید یا کلیک کنید",
         dropSubtext: "ویرایشگر تمامی تگ‌های ID3، پشتیبانی از کاور مربعی و پلیر استریم مستقیم",
+        lblCurrentFile: "فایل بارگذاری‌شده:",
         nonMp3Notice: "این فایل MP3 نیست؛ برای ویرایش تگ‌ها تبدیل به MP3 الزامی است.",
         btnConvert: "تبدیل به MP3",
         chooseCover: "انتخاب کاور آهنگ (کلیک کنید)",
@@ -1479,6 +1768,19 @@ UI_HTML = """
         applyTags: "تنظیم اطلاعات",
         applyCover: "تنظیم کاور",
         applyAll: "تنظیم اطلاعات و کاور",
+        viewLyrics: "متن ترانه",
+        btnApplyLyricsToComment: "درج در فیلد توضیحات و شعر",
+        lyricsTitle: "متن ترانه",
+        noLyricsFound: "متن ترانه‌ای برای این آهنگ یافت نشد.",
+        fetchingLyrics: "در حال دریافت شعر...",
+        lblAppUpdate: "بروزرسانی برنامه:",
+        btnCheckUpdate: "بررسی بروزرسانی",
+        checkingUpdate: "در حال بررسی...",
+        updateAvailable: "نسخه جدید منتشر شده است!",
+        updateLatest: "شما از آخرین نسخه برنامه استفاده می‌کنید.",
+        btnDownload: "دانلود نسخه جدید",
+        lastCheckedNever: "آخرین بررسی: هنوز انجام نشده",
+        lastCheckedPrefix: "آخرین بررسی: ",
         noInternet: "امکان برقراری ارتباط با وب وجود ندارد. لطفاً اتصال اینترنت خود را بررسی نمایید."
       }
     };
@@ -1495,6 +1797,10 @@ UI_HTML = """
         const key = el.getAttribute('data-i18n');
         if (dict[key]) el.innerText = dict[key];
       });
+
+      if (lastCheckedTimestamp) {
+        formatAndDisplayLastChecked(lastCheckedTimestamp);
+      }
     }
 
     function applyTheme(theme) {
@@ -1524,10 +1830,58 @@ UI_HTML = """
       if (res) renderFileState(res);
     }
 
+    // ----------------- بستن تمام مدال‌ها با کلیک روی فضای بیرونی -----------------
+    const allModals = ['detailModal', 'lyricsModal', 'settingsModal', 'confirmResetModal', 'cropModal', 'aboutModal'];
+    allModals.forEach(modalId => {
+      const modalEl = document.getElementById(modalId);
+      if (modalEl) {
+        modalEl.addEventListener('click', (e) => {
+          if (e.target === modalEl) {
+            modalEl.style.display = 'none';
+          }
+        });
+      }
+    });
+
+    // ----------------- پیاده‌سازی کامل Drag & Drop -----------------
     const dropZone = document.getElementById('dropZone');
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+      window.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'dragend'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const fileObj = e.dataTransfer.files[0];
+        const fullPath = fileObj.pywebviewFullPath || fileObj.path || "";
+        if (fullPath) {
+          const res = await window.pywebview.api.process_selected_file(fullPath);
+          if (res) renderFileState(res);
+        } else {
+          handleSelectFile();
+        }
+      }
+    });
 
     function renderFileState(res) {
       if (res.status === 'error') {
@@ -1535,6 +1889,11 @@ UI_HTML = """
         return;
       }
       currentFilePath = res.file_path;
+
+      const bar = document.getElementById('loadedFilenameBar');
+      const nameTxt = document.getElementById('displayLoadedFilename');
+      bar.style.display = 'flex';
+      nameTxt.innerText = res.filename || res.file_path.split('\\\\').pop().split('/').pop();
 
       if (res.status === 'needs_conversion') {
         document.getElementById('conversionBanner').style.display = 'flex';
@@ -1548,6 +1907,13 @@ UI_HTML = """
       }
     }
 
+    function copyCurrentFilename(btnEl) {
+      const nameTxt = document.getElementById('displayLoadedFilename').innerText;
+      if (nameTxt && nameTxt !== '---') {
+        copyTextWithFeedback(nameTxt, btnEl);
+      }
+    }
+
     async function convertCurrentFile() {
       const btn = document.getElementById('btnConvert');
       btn.disabled = true;
@@ -1558,6 +1924,7 @@ UI_HTML = """
 
       if (res.status === 'success') {
         document.getElementById('conversionBanner').style.display = 'none';
+        document.getElementById('displayLoadedFilename').innerText = res.filename;
         cachedInitialTags = JSON.parse(JSON.stringify(res.tags));
         loadMp3IntoEditor(res.file_path, res.tags, res.audio_data);
         showToast((currentLang === "fa") ? "تبدیل با موفقیت انجام شد." : "Conversion complete.");
@@ -1786,7 +2153,7 @@ UI_HTML = """
         card.className = 'result-card';
         card.onclick = () => openDetailModal(index);
         card.innerHTML = `
-          <img class="result-thumb" src="${item.artwork_url}">
+          <img class="result-thumb" src="${item.artwork_url}" alt="Cover">
           <div class="result-details">
             <h4 title="${item.title}">${item.title}</h4>
             <p title="${item.artist}">${item.artist} | ${item.album || 'Single'}</p>
@@ -1796,6 +2163,10 @@ UI_HTML = """
             <button class="btn-sm" onclick="applyOnlineData(${index}, 'tags')">${dict.applyTags}</button>
             <button class="btn-sm" onclick="applyOnlineData(${index}, 'cover')">${dict.applyCover}</button>
             <button class="btn-sm full-apply" onclick="applyOnlineData(${index}, 'all')">${dict.applyAll}</button>
+            <button class="btn-sm btn-lyrics" onclick="showLyricsModal(${index})">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              <span>${dict.viewLyrics}</span>
+            </button>
           </div>
         `;
         grid.appendChild(card);
@@ -1863,7 +2234,7 @@ UI_HTML = """
             <span class="field-title">${f.key}</span>
             <span class="field-val" title="${f.val}">${f.val}</span>
           </div>
-          <button class="copy-btn" title="Copy" onclick="copyTextToClipboard('${f.val.replace(/'/g, "\\'")}')">
+          <button class="copy-btn" title="Copy" onclick="copyTextWithFeedback('${f.val.replace(/'/g, "\\'")}', this)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         `;
@@ -1877,10 +2248,86 @@ UI_HTML = """
       document.getElementById('detailModal').style.display = 'none';
     }
 
-    function copyTextToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
+    function copyTextWithFeedback(text, btnElement) {
+      const originalSvg = btnElement.innerHTML;
+      
+      const doSuccess = () => {
+        btnElement.classList.add('copied');
+        btnElement.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
         showToast(translations[currentLang].copied);
-      });
+        setTimeout(() => {
+          btnElement.classList.remove('copied');
+          btnElement.innerHTML = originalSvg;
+        }, 1200);
+      };
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(doSuccess).catch(() => fallbackCopy(text, doSuccess));
+      } else {
+        fallbackCopy(text, doSuccess);
+      }
+    }
+
+    function fallbackCopy(text, onSuccess) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        if (onSuccess) onSuccess();
+      } catch (err) {
+        showToast("Copy failed", true);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    async function showLyricsModal(index) {
+      const item = window.cachedOnlineItems[index];
+      if (!item) return;
+
+      const modal = document.getElementById('lyricsModal');
+      const titleEl = document.getElementById('lyricsModalTitle');
+      const box = document.getElementById('lyricsContentBox');
+
+      titleEl.innerText = `${item.artist} - ${item.title}`;
+      box.innerText = translations[currentLang].fetchingLyrics;
+      modal.style.display = 'flex';
+
+      const res = await window.pywebview.api.fetch_lyrics(item.title, item.artist);
+      if (res.status === 'success') {
+        cachedFetchedLyrics = res.lyrics;
+        box.innerText = res.lyrics;
+      } else if (res.status === 'no_internet') {
+        box.innerText = translations[currentLang].noInternet;
+      } else {
+        cachedFetchedLyrics = "";
+        box.innerText = translations[currentLang].noLyricsFound;
+      }
+    }
+
+    function closeLyricsModal() {
+      document.getElementById('lyricsModal').style.display = 'none';
+    }
+
+    function copyLyricsText(btnEl) {
+      const box = document.getElementById('lyricsContentBox');
+      const text = box.innerText;
+      if (text && text !== translations[currentLang].noLyricsFound && text !== translations[currentLang].fetchingLyrics) {
+        copyTextWithFeedback(text, btnEl);
+      }
+    }
+
+    function applyLyricsToComment() {
+      if (cachedFetchedLyrics) {
+        document.getElementById('inputComment').value = cachedFetchedLyrics;
+        handleFieldChange();
+        closeLyricsModal();
+        showToast((currentLang === 'fa') ? "شعر در بخش توضیحات قرار گرفت." : "Lyrics set to comment field.");
+      }
     }
 
     async function copyImageToClipboard() {
@@ -1943,6 +2390,9 @@ UI_HTML = """
       btn.disabled = false;
       if (res.status === 'success') {
         currentFilePath = res.new_path;
+        if (res.filename) {
+          document.getElementById('displayLoadedFilename').innerText = res.filename;
+        }
         isModified = false;
         btn.disabled = true;
         showToast(translations[currentLang].savedSuccess);
@@ -1951,6 +2401,7 @@ UI_HTML = """
       }
     }
 
+    // ----------------- بخش تنظیمات و بررسی آپدیت -----------------
     async function openSettingsModal() {
       const settings = await window.pywebview.api.get_settings();
       document.getElementById('settingOverwrite').checked = settings.overwrite_original;
@@ -1987,10 +2438,80 @@ UI_HTML = """
       showToast((lang === 'fa') ? "تنظیمات اعمال و ذخیره شد." : "Settings saved permanently.");
     }
 
+    function formatAndDisplayLastChecked(date) {
+      lastCheckedTimestamp = date;
+      const lbl = document.getElementById('txtLastCheckedTime');
+      const prefix = translations[currentLang].lastCheckedPrefix;
+      if (currentLang === 'fa') {
+        const faDate = new Intl.DateTimeFormat('fa-IR', {
+          year: 'numeric', month: 'long', day: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(date);
+        lbl.innerText = `${prefix}${faDate}`;
+      } else {
+        const enDate = new Intl.DateTimeFormat('en-US', {
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(date);
+        lbl.innerText = `${prefix}${enDate}`;
+      }
+    }
+
+    async function checkAppUpdates(isManual = false) {
+      const btn = document.getElementById('btnManualCheckUpdate');
+      if (isManual) {
+        btn.disabled = true;
+        btn.innerText = translations[currentLang].checkingUpdate;
+      }
+
+      const res = await window.pywebview.api.check_for_updates();
+      formatAndDisplayLastChecked(new Date());
+
+      if (isManual) {
+        btn.disabled = false;
+        btn.innerText = translations[currentLang].btnCheckUpdate;
+      }
+
+      const badge = document.getElementById('settingsUpdateBadge');
+      const banner = document.getElementById('updateFoundBanner');
+      const bannerTitle = document.getElementById('updateFoundTitle');
+      const bannerSub = document.getElementById('updateFoundSub');
+
+      if (res && res.status === 'success') {
+        if (res.has_update) {
+          badge.style.display = 'block';
+          banner.style.display = 'flex';
+          bannerTitle.innerText = `${translations[currentLang].updateAvailable} (${res.latest_version})`;
+          bannerSub.innerText = (currentLang === 'fa') ? "نسخه جدید در گیت‌هاب منتشر شده و آماده دانلود است." : "New update is available on GitHub.";
+          latestDownloadUrl = res.download_url;
+          if (isManual) {
+            showToast(`${translations[currentLang].updateAvailable} (${res.latest_version})`);
+          }
+        } else {
+          badge.style.display = 'none';
+          banner.style.display = 'none';
+          if (isManual) {
+            showToast(translations[currentLang].updateLatest);
+          }
+        }
+      } else if (isManual && res && res.status === 'no_internet') {
+        showToast(translations[currentLang].noInternet, true);
+      }
+    }
+
+    function manualCheckForUpdates() {
+      checkAppUpdates(true);
+    }
+
+    async function downloadLatestRelease() {
+      if (latestDownloadUrl) {
+        await window.pywebview.api.open_external_url(latestDownloadUrl);
+      }
+    }
+
     function openAboutModal() { document.getElementById('aboutModal').style.display = 'flex'; }
     function closeAboutModal() { document.getElementById('aboutModal').style.display = 'none'; }
 
-    // فراخوانی تنظیمات ذخیره شده از دیسک در هنگام شروع
     async function initSavedSettings() {
       try {
         const settings = await window.pywebview.api.get_settings();
@@ -2000,6 +2521,10 @@ UI_HTML = """
         applyLanguage('en');
         applyTheme('system');
       }
+      // بررسی خودکار آپدیت در پس‌زمینه هنگام شروع برنامه
+      setTimeout(() => {
+        checkAppUpdates(false);
+      }, 1500);
     }
 
     window.addEventListener('pywebviewready', initSavedSettings);
