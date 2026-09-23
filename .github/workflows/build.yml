@@ -1,13 +1,12 @@
 name: Build & Release AudioFlow Studio
 
 on:
-  push:
-    tags:
-      - 'v*' # هر زمان تگی مثل v1.0.0 پوش شود، اجرا می‌شود
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
-  contents: write # دسترسی ایجاد Release و آپلود فایل
+  contents: write
 
 jobs:
   build:
@@ -33,12 +32,18 @@ jobs:
       run: |
         pyinstaller --noconfirm --onefile --windowed --name="AudioFlow-Studio" --icon="icon.ico" --add-data "Vazirmatn.ttf;." --collect-binaries imageio_ffmpeg --hidden-import="clr" --hidden-import="webview.platforms.winforms" --hidden-import="mutagen.id3" --hidden-import="win32clipboard" app.py
 
-    - name: Create GitHub Release and Upload Exe
+    - name: Rename Executable with Version Tag
+      shell: bash
+      run: |
+        TAG_NAME="${{ github.ref_name }}"
+        if [ -z "$TAG_NAME" ] || [ "$TAG_NAME" = "main" ]; then
+          VERSION_SUFFIX="v.1.1.0"
+        else
+          VERSION_SUFFIX=$(echo "$TAG_NAME" | sed 's/^v\([0-9]\)/v.\1/')
+        fi
+        mv dist/AudioFlow-Studio.exe "dist/AudioFlow-Studio_${VERSION_SUFFIX}.exe"
+
+    - name: Upload Exe to Release
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: AudioFlow Studio ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-        files: dist/AudioFlow-Studio.exe
+        files: dist/AudioFlow-Studio_*.exe
