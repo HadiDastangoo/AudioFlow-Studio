@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import html
 import base64
 import shutil
 import subprocess
@@ -16,8 +17,6 @@ from mutagen.id3 import (
     TPUB, TMOO, USLT, TBPM, TOPE, TSRC, error
 )
 from mutagen.mp3 import MP3
-import html
-import re
 
 # ----------------- متغیرهای سراسری برنامه -----------------
 APP_NAME = "AudioFlow Studio"
@@ -109,7 +108,6 @@ class MusicTaggerAPI:
             return False
 
     def open_external_url(self, url):
-        """باز کردن لینک دانلود یا گیتهاب در مرورگر اصلی سیستم کاربر"""
         try:
             webbrowser.open(url)
             return {"status": "success"}
@@ -117,7 +115,6 @@ class MusicTaggerAPI:
             return {"status": "error", "message": str(e)}
 
     def check_for_updates(self):
-        """بررسی آنلاین وجود نسخه جدیدتر در گیت‌هاب"""
         if not self.is_online():
             return {"status": "no_internet"}
 
@@ -429,7 +426,7 @@ class MusicTaggerAPI:
             return {"status": "not_found"}
 
     def translate_lyrics(self, lyrics_text, target_lang="fa"):
-        """ترجمه بند به بند و خط به خط پایدار با رفع قطعی کدهای شکست خط"""
+        """ترجمه بند به بند و خط به خط با سرویس پایدار MyMemory و رفع انتیتی‌های خط جدید"""
         if not self.is_online():
             return {"status": "no_internet"}
         if not lyrics_text or not lyrics_text.strip():
@@ -478,7 +475,6 @@ class MusicTaggerAPI:
                     raw_text = res_data.get("responseData", {}).get("translatedText", "")
                     
                     if raw_text:
-                        # رمزگشایی انتیتی‌ها و تبدیل صریح کدهای عددی به شکست خط
                         cleaned = html.unescape(raw_text)
                         cleaned = cleaned.replace("&#10;", "\n").replace("&#13;", "").replace("&amp;#10;", "\n")
                         all_translated_lines.extend(cleaned.splitlines())
@@ -487,7 +483,6 @@ class MusicTaggerAPI:
                 else:
                     all_translated_lines.extend(ch.splitlines())
 
-            # تناظر دقیق خطوط اصلی و ترجمه برای ساخت خروجی ترکیبی
             for idx, orig_line in enumerate(lines):
                 orig_s = orig_line.strip()
                 if not orig_s:
@@ -963,7 +958,6 @@ UI_HTML = """
     color: #fff;
   }
 
-  /* نوار تامبنیل کاورها */
   .covers-thumbnails-strip {
     display: flex;
     align-items: center;
@@ -1017,7 +1011,7 @@ UI_HTML = """
   }
   .thumb-add-btn span { font-size: 0.68rem; font-weight: 600; }
 
-  /* پلیر اختصاصی با جهت LTR دائمی */
+  /* پلیر مدرن با جهت LTR دائمی و پدینگ ۲۰ پیکسلی برای تراز عمودی دقیق */
   .custom-audio-player {
     direction: ltr !important;
     text-align: left;
@@ -1054,8 +1048,8 @@ UI_HTML = """
     flex: 1;
     justify-content: center;
     gap: 6px;
-    padding-top:20px;
     min-height: 40px;
+    padding-top: 20px;
   }
   .player-progress-bar-wrap {
     width: 100%;
@@ -1139,7 +1133,6 @@ UI_HTML = """
     box-shadow: 0 0 0 3px rgba(255, 119, 0, 0.15);
   }
 
-  /* فیلدهای پیشرفته / آکاردئون سایر تگ‌ها */
   .extended-tags-accordion {
     background: var(--input-bg);
     border: 1px solid var(--border-color);
@@ -1994,7 +1987,6 @@ UI_HTML = """
     </div>
   </div>
 
-  <!-- مدال متن ترانه (Lyrics) به همراه ترجمه آنلاین، تب‌های ترکیبی و زبان‌ها -->
   <div class="modal-backdrop" id="lyricsModal">
     <div class="modal-dialog" style="width: 680px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2006,13 +1998,13 @@ UI_HTML = """
 
       <div class="lyrics-toolbar">
         <div class="lyrics-tabs">
-          <button class="lyrics-tab-btn active" id="tabLyricsCombined" onclick="switchLyricsTab('combined')" data-i18n="tabCombined">Original + Translation</button>
-          <button class="lyrics-tab-btn" id="tabLyricsTrans" onclick="switchLyricsTab('translated')" data-i18n="tabTranslated">Translation Only</button>
-          <button class="lyrics-tab-btn" id="tabLyricsOrig" onclick="switchLyricsTab('original')" data-i18n="tabOriginal">Original Only</button>
+          <button class="lyrics-tab-btn active" id="tabLyricsOrig" onclick="switchLyricsTab('original')" data-i18n="tabOriginal">Original</button>
+          <button class="lyrics-tab-btn" id="tabLyricsTrans" onclick="switchLyricsTab('translated')" data-i18n="tabTranslated">Translation</button>
+          <button class="lyrics-tab-btn" id="tabLyricsCombined" onclick="switchLyricsTab('combined')" data-i18n="tabCombined">Original + Translation</button>
         </div>
 
         <div class="lyrics-trans-controls">
-          <select class="lyrics-trans-select" id="selectLyricsLang" onchange="translateCurrentLyrics()">
+          <select class="lyrics-trans-select" id="selectLyricsLang">
             <option value="fa">فارسی (FA)</option>
             <option value="en">English (EN)</option>
           </select>
@@ -2169,7 +2161,7 @@ UI_HTML = """
     let cachedOrigLyrics = "";
     let cachedTransLyrics = "";
     let cachedCombinedLyrics = "";
-    let currentLyricsTab = "combined";
+    let currentLyricsTab = "original";
 
     let latestDownloadUrl = "";
     let lastCheckedTimestamp = null;
@@ -2275,8 +2267,8 @@ UI_HTML = """
         noInternet: "Unable to connect to the internet. Please check your network connection.",
         allCoversAdded: "All supported cover types are already added.",
         tabCombined: "Original + Translation",
-        tabTranslated: "Translation Only",
-        tabOriginal: "Original Only",
+        tabTranslated: "Translation",
+        tabOriginal: "Original",
         btnTranslate: "Translate",
         translating: "Translating..."
       },
@@ -2360,8 +2352,8 @@ UI_HTML = """
         noInternet: "امکان برقراری ارتباط با وب وجود ندارد. لطفاً اتصال اینترنت خود را بررسی نمایید.",
         allCoversAdded: "تمام انواع مجاز کاور قبلاً اضافه شده‌اند.",
         tabCombined: "متن و ترجمه (ترکیبی)",
-        tabTranslated: "فقط ترجمه",
-        tabOriginal: "فقط متن اصلی",
+        tabTranslated: "ترجمه",
+        tabOriginal: "متن اصلی",
         btnTranslate: "ترجمه متن",
         translating: "در حال ترجمه..."
       }
@@ -3105,7 +3097,7 @@ UI_HTML = """
       document.body.removeChild(textArea);
     }
 
-    // ----------------- مدیریت متن ترانه و ترجمه آنلاین با MyMemory -----------------
+    // ----------------- مدال متن ترانه و ترجمه آنلاین با باز شدن پیش‌فرض روی متن اصلی -----------------
     async function showLyricsModal(index) {
       const item = window.cachedOnlineItems[index];
       if (!item) return;
@@ -3121,7 +3113,9 @@ UI_HTML = """
       cachedOrigLyrics = "";
       cachedTransLyrics = "";
       cachedCombinedLyrics = "";
-      currentLyricsTab = "combined";
+
+      switchLyricsTab('original');
+      updateTranslationTabsAvailability(false);
 
       const selectLang = document.getElementById('selectLyricsLang');
       selectLang.value = (currentLang === "fa") ? "fa" : "en";
@@ -3129,7 +3123,7 @@ UI_HTML = """
       const res = await window.pywebview.api.fetch_lyrics(item.title, item.artist);
       if (res.status === 'success') {
         cachedOrigLyrics = res.lyrics;
-        await translateCurrentLyrics(true);
+        displayActiveLyricsTab();
       } else if (res.status === 'no_internet') {
         box.innerText = translations[currentLang].noInternet;
       } else {
@@ -3137,7 +3131,19 @@ UI_HTML = """
       }
     }
 
-    async function translateCurrentLyrics(isInitial = false) {
+    function updateTranslationTabsAvailability(hasTranslation) {
+      const btnCombined = document.getElementById('tabLyricsCombined');
+      const btnTrans = document.getElementById('tabLyricsTrans');
+      
+      btnCombined.disabled = !hasTranslation;
+      btnTrans.disabled = !hasTranslation;
+      btnCombined.style.opacity = hasTranslation ? "1" : "0.5";
+      btnTrans.style.opacity = hasTranslation ? "1" : "0.5";
+      btnCombined.style.cursor = hasTranslation ? "pointer" : "not-allowed";
+      btnTrans.style.cursor = hasTranslation ? "pointer" : "not-allowed";
+    }
+
+    async function translateCurrentLyrics() {
       if (!cachedOrigLyrics) return;
 
       const targetLang = document.getElementById('selectLyricsLang').value;
@@ -3146,10 +3152,7 @@ UI_HTML = """
 
       btn.disabled = true;
       btn.innerText = translations[currentLang].translating;
-
-      if (!isInitial) {
-        box.innerText = translations[currentLang].translating;
-      }
+      box.innerText = translations[currentLang].translating;
 
       const res = await window.pywebview.api.translate_lyrics(cachedOrigLyrics, targetLang);
       btn.disabled = false;
@@ -3158,16 +3161,21 @@ UI_HTML = """
       if (res.status === 'success') {
         cachedTransLyrics = res.translated_text;
         cachedCombinedLyrics = res.combined_text;
-        displayActiveLyricsTab();
+        updateTranslationTabsAvailability(true);
+        switchLyricsTab('combined');
       } else {
         cachedTransLyrics = "";
         cachedCombinedLyrics = "";
+        updateTranslationTabsAvailability(false);
         switchLyricsTab('original');
         showToast((res.status === 'no_internet') ? translations[currentLang].noInternet : "Translation error.", true);
       }
     }
 
     function switchLyricsTab(tabName) {
+      if ((tabName === 'combined' || tabName === 'translated') && !cachedTransLyrics) {
+        return;
+      }
       currentLyricsTab = tabName;
       document.getElementById('tabLyricsCombined').classList.toggle('active', tabName === 'combined');
       document.getElementById('tabLyricsTrans').classList.toggle('active', tabName === 'translated');
