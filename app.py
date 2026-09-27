@@ -11,14 +11,32 @@ from io import BytesIO
 from PIL import Image
 import webview
 import imageio_ffmpeg
-from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TRCK, TCON, TCOM, TPOS, TCOP, COMM, error
+from mutagen.id3 import (
+    ID3, APIC, TIT2, TPE1, TALB, TDRC, TRCK, TCON, TCOM, TPOS, TCOP, COMM,
+    TPUB, TMOO, USLT, TBPM, TOPE, TSRC, error
+)
 from mutagen.mp3 import MP3
+import html
+import re
 
 # ----------------- متغیرهای سراسری برنامه -----------------
 APP_NAME = "AudioFlow Studio"
-APP_VERSION = "v.1.1.0"
+APP_VERSION = "v.1.2.0"
 GITHUB_REPO = "HadiDastangoo/AudioFlow-Studio"
 # --------------------------------------------------------
+
+APIC_TYPES = {
+    3: "Front Cover (Main)",
+    4: "Back Cover",
+    7: "Lead Artist / Performer",
+    11: "Composer",
+    9: "Band / Orchestra",
+    12: "Lyricist",
+    15: "Recording Location",
+    14: "Illustration",
+    19: "Artist Logo",
+    20: "Publisher / Studio Logo"
+}
 
 def get_embedded_font_css():
     """خوانش فونت وزیرمتن محلی و تبدیل به Base64 برای استقلال کامل و یکسانی ظاهر در همه سیستم‌ها"""
@@ -51,6 +69,7 @@ class MusicTaggerAPI:
         self._window = None
         self.current_file_path = None
         self.initial_tags = {}
+        self.initial_covers = []
         
         base_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         self.config_path = os.path.join(base_dir, "config.json")
@@ -111,7 +130,6 @@ class MusicTaggerAPI:
                 latest_tag = data.get("tag_name", "").strip()
                 html_url = data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases")
                 
-                # پیدا کردن لینک فایل .exe در Assets ریلیز گیت‌هاب
                 download_url = html_url
                 for asset in data.get("assets", []):
                     if asset.get("name", "").endswith(".exe"):
@@ -201,14 +219,16 @@ class MusicTaggerAPI:
         filename = os.path.basename(file_path)
 
         if ext == ".mp3":
-            tags_data = self._read_full_mp3_data(file_path)
+            tags_data, covers_data = self._read_full_mp3_data(file_path)
             self.initial_tags = dict(tags_data)
+            self.initial_covers = list(covers_data)
             audio_base64 = self._get_audio_data_url(file_path)
             return {
                 "status": "ready_mp3",
                 "file_path": file_path,
                 "filename": filename,
                 "tags": tags_data,
+                "covers": covers_data,
                 "audio_data": audio_base64
             }
         else:
@@ -248,8 +268,9 @@ class MusicTaggerAPI:
                 return {"status": "error", "message": "Conversion failed."}
 
             self.current_file_path = output_path
-            tags_data = self._read_full_mp3_data(output_path)
+            tags_data, covers_data = self._read_full_mp3_data(output_path)
             self.initial_tags = dict(tags_data)
+            self.initial_covers = list(covers_data)
             audio_base64 = self._get_audio_data_url(output_path)
 
             return {
@@ -257,6 +278,7 @@ class MusicTaggerAPI:
                 "file_path": output_path,
                 "filename": os.path.basename(output_path),
                 "tags": tags_data,
+                "covers": covers_data,
                 "audio_data": audio_base64
             }
         except Exception as e:
@@ -271,7 +293,7 @@ class MusicTaggerAPI:
             return ""
 
     def _read_full_mp3_data(self, file_path):
-        data = {
+        tags_data = {
             "title": "",
             "artist": "",
             "album": "",
@@ -282,36 +304,64 @@ class MusicTaggerAPI:
             "disc": "",
             "copyright": "",
             "comment": "",
-            "cover_base64": ""
+            "publisher": "",
+            "mood": "",
+            "lyrics": "",
+            "bpm": "",
+            "original_artist": "",
+            "isrc": ""
         }
+        covers_data = []
+
         try:
             audio = MP3(file_path, ID3=ID3)
             if audio.tags:
                 tags = audio.tags
-                if 'TIT2' in tags: data["title"] = str(tags['TIT2'].text[0])
-                if 'TPE1' in tags: data["artist"] = str(tags['TPE1'].text[0])
-                if 'TALB' in tags: data["album"] = str(tags['TALB'].text[0])
-                if 'TDRC' in tags: data["year"] = str(tags['TDRC'].text[0])
-                if 'TRCK' in tags: data["track"] = str(tags['TRCK'].text[0])
-                if 'TCON' in tags: data["genre"] = str(tags['TCON'].text[0])
-                if 'TCOM' in tags: data["composer"] = str(tags['TCOM'].text[0])
-                if 'TPOS' in tags: data["disc"] = str(tags['TPOS'].text[0])
-                if 'TCOP' in tags: data["copyright"] = str(tags['TCOP'].text[0])
+                if 'TIT2' in tags: tags_data["title"] = str(tags['TIT2'].text[0])
+                if 'TPE1' in tags: tags_data["artist"] = str(tags['TPE1'].text[0])
+                if 'TALB' in tags: tags_data["album"] = str(tags['TALB'].text[0])
+                if 'TDRC' in tags: tags_data["year"] = str(tags['TDRC'].text[0])
+                if 'TRCK' in tags: tags_data["track"] = str(tags['TRCK'].text[0])
+                if 'TCON' in tags: tags_data["genre"] = str(tags['TCON'].text[0])
+                if 'TCOM' in tags: tags_data["composer"] = str(tags['TCOM'].text[0])
+                if 'TPOS' in tags: tags_data["disc"] = str(tags['TPOS'].text[0])
+                if 'TCOP' in tags: tags_data["copyright"] = str(tags['TCOP'].text[0])
+
+                if 'TPUB' in tags: tags_data["publisher"] = str(tags['TPUB'].text[0])
+                if 'TMOO' in tags: tags_data["mood"] = str(tags['TMOO'].text[0])
+                if 'TBPM' in tags: tags_data["bpm"] = str(tags['TBPM'].text[0])
+                if 'TOPE' in tags: tags_data["original_artist"] = str(tags['TOPE'].text[0])
+                if 'TSRC' in tags: tags_data["isrc"] = str(tags['TSRC'].text[0])
 
                 for key in tags.keys():
                     if key.startswith('COMM'):
-                        data["comment"] = str(tags[key].text[0])
+                        tags_data["comment"] = str(tags[key].text[0])
                         break
 
-                for tag in tags.values():
+                for key in tags.keys():
+                    if key.startswith('USLT'):
+                        tags_data["lyrics"] = str(tags[key].text)
+                        break
+
+                for key, tag in tags.items():
                     if isinstance(tag, APIC):
                         encoded = base64.b64encode(tag.data).decode('utf-8')
-                        data["cover_base64"] = f"data:{tag.mime};base64,{encoded}"
-                        break
+                        pic_type = tag.type if hasattr(tag, 'type') else 3
+                        type_name = APIC_TYPES.get(pic_type, f"Type {pic_type}")
+                        covers_data.append({
+                            "type": pic_type,
+                            "type_name": type_name,
+                            "mime": tag.mime,
+                            "desc": tag.desc or type_name,
+                            "dataUrl": f"data:{tag.mime};base64,{encoded}"
+                        })
+
+                covers_data.sort(key=lambda c: (0 if c["type"] == 3 else 1, c["type"]))
+
         except Exception:
             pass
 
-        return data
+        return tags_data, covers_data
 
     def search_online_metadata(self, title, artist):
         if not self.is_online():
@@ -352,7 +402,7 @@ class MusicTaggerAPI:
         if not self.is_online():
             return {"status": "no_internet"}
 
-        headers = {'User-Agent': 'AudioFlowStudio/1.1 (https://github.com)'}
+        headers = {'User-Agent': 'AudioFlowStudio/1.2 (https://github.com)'}
         try:
             get_url = f"https://lrclib.net/api/get?track_name={requests.utils.quote(title)}&artist_name={requests.utils.quote(artist)}"
             resp = requests.get(get_url, headers=headers, timeout=6)
@@ -377,6 +427,88 @@ class MusicTaggerAPI:
             return {"status": "no_internet"}
         except Exception:
             return {"status": "not_found"}
+
+    def translate_lyrics(self, lyrics_text, target_lang="fa"):
+        """ترجمه بند به بند و خط به خط پایدار با رفع قطعی کدهای شکست خط"""
+        if not self.is_online():
+            return {"status": "no_internet"}
+        if not lyrics_text or not lyrics_text.strip():
+            return {"status": "empty"}
+
+        try:
+            lines = lyrics_text.splitlines()
+            only_translated = []
+            combined_lines = []
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+
+            chunks = []
+            current_chunk = []
+            current_len = 0
+
+            for line in lines:
+                l_strip = line.strip()
+                add_len = len(l_strip) + 1
+                if current_chunk and (current_len + add_len > 350):
+                    chunks.append("\n".join(current_chunk))
+                    current_chunk = [l_strip]
+                    current_len = add_len
+                else:
+                    current_chunk.append(l_strip)
+                    current_len += add_len
+
+            if current_chunk:
+                chunks.append("\n".join(current_chunk))
+
+            all_translated_lines = []
+
+            for ch in chunks:
+                if not ch.strip():
+                    all_translated_lines.extend([""] * len(ch.splitlines()))
+                    continue
+
+                encoded_q = requests.utils.quote(ch)
+                url = f"https://api.mymemory.translated.net/get?q={encoded_q}&langpair=autodetect|{target_lang}"
+                r = requests.get(url, headers=headers, timeout=10)
+                
+                if r.status_code == 200:
+                    res_data = r.json()
+                    raw_text = res_data.get("responseData", {}).get("translatedText", "")
+                    
+                    if raw_text:
+                        # رمزگشایی انتیتی‌ها و تبدیل صریح کدهای عددی به شکست خط
+                        cleaned = html.unescape(raw_text)
+                        cleaned = cleaned.replace("&#10;", "\n").replace("&#13;", "").replace("&amp;#10;", "\n")
+                        all_translated_lines.extend(cleaned.splitlines())
+                    else:
+                        all_translated_lines.extend(ch.splitlines())
+                else:
+                    all_translated_lines.extend(ch.splitlines())
+
+            # تناظر دقیق خطوط اصلی و ترجمه برای ساخت خروجی ترکیبی
+            for idx, orig_line in enumerate(lines):
+                orig_s = orig_line.strip()
+                if not orig_s:
+                    only_translated.append("")
+                    combined_lines.append("")
+                else:
+                    t_line = all_translated_lines[idx].strip() if idx < len(all_translated_lines) and all_translated_lines[idx].strip() else orig_s
+                    only_translated.append(t_line)
+                    combined_lines.append(orig_s)
+                    combined_lines.append(t_line)
+                    combined_lines.append("")
+
+            return {
+                "status": "success",
+                "translated_text": "\n".join(only_translated).strip(),
+                "combined_text": "\n".join(combined_lines).strip()
+            }
+        except requests.exceptions.RequestException:
+            return {"status": "no_internet"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     def fetch_image_base64(self, url):
         if not self.is_online():
@@ -422,7 +554,7 @@ class MusicTaggerAPI:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def save_music_tags(self, file_path, tags, new_cover_base64=None):
+    def save_music_tags(self, file_path, tags, covers_list=None):
         if not os.path.exists(file_path):
             return {"status": "error", "message": "File not found."}
 
@@ -455,26 +587,41 @@ class MusicTaggerAPI:
             id3_audio.delall('TCOP'); id3_audio.add(TCOP(encoding=3, text=tags.get("copyright", "")))
             id3_audio.delall('COMM'); id3_audio.add(COMM(encoding=3, lang='eng', desc='desc', text=tags.get("comment", "")))
 
-            if new_cover_base64 and "," in new_cover_base64:
-                header, base64_data = new_cover_base64.split(",", 1)
-                mime = header.split(";")[0].split(":")[1] if ":" in header else "image/jpeg"
-                img_bytes = base64.b64decode(base64_data)
+            id3_audio.delall('TPUB'); id3_audio.add(TPUB(encoding=3, text=tags.get("publisher", "")))
+            id3_audio.delall('TMOO'); id3_audio.add(TMOO(encoding=3, text=tags.get("mood", "")))
+            id3_audio.delall('TBPM'); id3_audio.add(TBPM(encoding=3, text=tags.get("bpm", "")))
+            id3_audio.delall('TOPE'); id3_audio.add(TOPE(encoding=3, text=tags.get("original_artist", "")))
+            id3_audio.delall('TSRC'); id3_audio.add(TSRC(encoding=3, text=tags.get("isrc", "")))
+            
+            lyrics_text = tags.get("lyrics", "")
+            id3_audio.delall('USLT')
+            if lyrics_text:
+                id3_audio.add(USLT(encoding=3, lang='eng', desc='', text=lyrics_text))
 
-                id3_audio.delall('APIC')
-                id3_audio.add(
-                    APIC(
-                        encoding=3,
-                        mime=mime,
-                        type=3,
-                        desc='Cover',
-                        data=img_bytes
-                    )
-                )
+            id3_audio.delall('APIC')
+            if covers_list and isinstance(covers_list, list):
+                for cov in covers_list:
+                    raw_data_url = cov.get("dataUrl", "")
+                    if raw_data_url and "," in raw_data_url:
+                        header, base64_data = raw_data_url.split(",", 1)
+                        mime = header.split(";")[0].split(":")[1] if ":" in header else "image/jpeg"
+                        img_bytes = base64.b64decode(base64_data)
+                        p_type = int(cov.get("type", 3))
+                        desc = cov.get("desc") or APIC_TYPES.get(p_type, "Cover")
+                        id3_audio.add(
+                            APIC(
+                                encoding=3,
+                                mime=mime,
+                                type=p_type,
+                                desc=desc,
+                                data=img_bytes
+                            )
+                        )
 
             id3_audio.save(target_path, v2_version=3)
             self.current_file_path = target_path
             self.initial_tags = dict(tags)
-            self.initial_tags["cover_base64"] = new_cover_base64
+            self.initial_covers = list(covers_list or [])
 
             return {"status": "success", "new_path": target_path, "filename": os.path.basename(target_path)}
         except Exception as e:
@@ -497,7 +644,7 @@ UI_HTML = """
     --accent-purple: #7952b3;
     --accent-purple-light: #f3eefb;
     --bg-gradient: linear-gradient(135deg, #f8f9fa 0%, #edf1f5 100%);
-    --glass-bg: rgba(255, 255, 255, 0.78);
+    --glass-bg: rgba(255, 255, 255, 0.82);
     --glass-border: rgba(255, 255, 255, 0.95);
     --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0,0,0,0.03);
     --text-main: #2b2f38;
@@ -507,21 +654,25 @@ UI_HTML = """
     --border-color: #dce2e8;
     --modal-bg: #ffffff;
     --cover-bg: #f1f3f6;
+    --player-bg: rgba(255, 255, 255, 0.9);
+    --player-border: #dce2e8;
   }
 
   body.theme-dark {
     --bg-gradient: linear-gradient(135deg, #14171c 0%, #1d2229 100%);
-    --glass-bg: rgba(29, 34, 42, 0.82);
+    --glass-bg: rgba(29, 34, 42, 0.85);
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     --text-main: #f0f3f8;
     --text-muted: #9aa2b1;
     --card-bg: rgba(36, 42, 52, 0.92);
-    --input-bg: rgba(22, 26, 32, 0.8);
+    --input-bg: rgba(22, 26, 32, 0.85);
     --border-color: rgba(255, 255, 255, 0.12);
     --modal-bg: #1e232b;
     --cover-bg: #16191f;
     --accent-purple-light: rgba(121, 82, 179, 0.2);
+    --player-bg: rgba(25, 30, 38, 0.9);
+    --player-border: rgba(255, 255, 255, 0.1);
   }
 
   html, body {
@@ -546,11 +697,6 @@ UI_HTML = """
   }
   body.theme-dark ::-webkit-scrollbar-thumb:hover {
     background-color: var(--primary);
-  }
-  ::-webkit-scrollbar-button,
-  ::-webkit-scrollbar-corner {
-    display: none;
-    background: transparent;
   }
 
   * { 
@@ -626,7 +772,6 @@ UI_HTML = """
   }
   .icon-btn:hover, .icon-btn.active { border-color: var(--primary); color: var(--primary); background: var(--card-bg); }
 
-  /* نشانگر دایره قرمز برای اطلاع‌رسانی آپدیت */
   .update-badge {
     display: none;
     position: absolute;
@@ -639,10 +784,7 @@ UI_HTML = """
     border: 2px solid var(--glass-bg);
     box-shadow: 0 0 6px rgba(230, 57, 70, 0.8);
   }
-  [dir="rtl"] .update-badge {
-    right: auto;
-    left: 5px;
-  }
+  [dir="rtl"] .update-badge { right: auto; left: 5px; }
 
   .about-btn {
     background: transparent;
@@ -722,28 +864,32 @@ UI_HTML = """
 
   .editor-grid {
     display: none;
-    grid-template-columns: 500px 1fr;
+    grid-template-columns: 460px 1fr;
     gap: 28px;
-    align-items: stretch;
+    align-items: start;
   }
 
   .left-panel {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    height: 100%;
   }
+  
+  .cover-box-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
   .cover-card {
-    width: 500px;
-    flex: 1;
-    min-height: 480px;
+    width: 460px;
+    height: 460px;
     border-radius: 24px;
     position: relative;
     overflow: hidden;
     background: var(--cover-bg);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
-    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -759,7 +905,26 @@ UI_HTML = """
     align-items: center;
     gap: 10px;
     color: var(--text-muted);
+    cursor: pointer;
   }
+  .cover-type-tag {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    z-index: 5;
+    pointer-events: none;
+    display: none;
+  }
+  [dir="rtl"] .cover-type-tag { left: auto; right: 14px; }
+
   .cover-overlay {
     position: absolute;
     inset: 0;
@@ -767,25 +932,170 @@ UI_HTML = """
     opacity: 0;
     transition: opacity 0.25s ease;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    font-size: 0.95rem;
-    gap: 8px;
+    gap: 12px;
+    z-index: 4;
   }
   .cover-card:hover .cover-overlay { opacity: 1; }
 
-  .player-card {
-    background: var(--card-bg);
-    border-radius: 18px;
-    padding: 14px 20px;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
+  .cover-action-circle-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    color: #2b2f38;
     display: flex;
     align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   }
-  .player-card audio { width: 100%; height: 38px; outline: none; }
+  .cover-action-circle-btn:hover {
+    transform: scale(1.1);
+    background: var(--primary);
+    color: #fff;
+  }
+  .cover-action-circle-btn.btn-delete:hover {
+    background: #d9534f;
+    color: #fff;
+  }
+
+  /* نوار تامبنیل کاورها */
+  .covers-thumbnails-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 6px 2px 10px 2px;
+  }
+  .thumb-item {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    overflow: hidden;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.2s ease;
+    background: var(--cover-bg);
+  }
+  .thumb-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .thumb-item.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light), 0 4px 10px rgba(255,119,0,0.3);
+  }
+  .thumb-item:hover:not(.active) {
+    border-color: var(--text-muted);
+  }
+  .thumb-add-btn {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    border: 2px dashed var(--primary);
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    gap: 2px;
+  }
+  .thumb-add-btn:hover {
+    background: var(--primary);
+    color: #fff;
+  }
+  .thumb-add-btn span { font-size: 0.68rem; font-weight: 600; }
+
+  /* پلیر اختصاصی با جهت LTR دائمی */
+  .custom-audio-player {
+    direction: ltr !important;
+    text-align: left;
+    background: var(--player-bg);
+    border: 1px solid var(--player-border);
+    border-radius: 18px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    backdrop-filter: blur(12px);
+    box-shadow: var(--glass-shadow);
+    margin-bottom: 4px;
+  }
+  .player-play-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(255,119,0,0.3);
+    transition: transform 0.15s ease, background 0.2s ease;
+    flex-shrink: 0;
+  }
+  .player-play-btn:hover { transform: scale(1.06); background: var(--primary-hover); }
+  .player-timeline-box {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    justify-content: center;
+    gap: 6px;
+    padding-top:20px;
+    min-height: 40px;
+  }
+  .player-progress-bar-wrap {
+    width: 100%;
+    height: 6px;
+    background: rgba(120, 130, 140, 0.25);
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    direction: ltr !important;
+  }
+  .player-progress-current {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 999px;
+    width: 0%;
+    position: relative;
+    transition: width 0.05s linear;
+  }
+  .player-time-display {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    font-family: monospace, 'Vazirmatn';
+    direction: ltr !important;
+  }
+  .player-vol-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    direction: ltr !important;
+  }
+  .player-vol-slider {
+    width: 65px;
+    height: 4px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    direction: ltr !important;
+  }
 
   .right-panel {
     background: var(--glass-bg);
@@ -793,34 +1103,32 @@ UI_HTML = """
     box-shadow: var(--glass-shadow);
     backdrop-filter: blur(14px);
     border-radius: 24px;
-    padding: 26px 30px;
+    padding: 24px 28px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: 12px;
-    height: 100%;
+    gap: 14px;
   }
   .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 12px;
   }
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
   }
   .form-group label {
-    font-size: 0.84rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--text-main);
   }
   .form-control {
     background: var(--input-bg);
     border: 1px solid var(--border-color);
-    padding: 9px 14px;
+    padding: 8px 12px;
     border-radius: 10px;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     color: var(--text-main);
     transition: border-color 0.2s, box-shadow 0.2s;
     user-select: text !important;
@@ -831,16 +1139,53 @@ UI_HTML = """
     box-shadow: 0 0 0 3px rgba(255, 119, 0, 0.15);
   }
 
+  /* فیلدهای پیشرفته / آکاردئون سایر تگ‌ها */
+  .extended-tags-accordion {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .extended-accordion-header {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+    background: rgba(120, 130, 140, 0.05);
+    transition: background 0.2s;
+  }
+  .extended-accordion-header:hover {
+    background: rgba(120, 130, 140, 0.1);
+  }
+  .extended-accordion-header svg {
+    transition: transform 0.25s ease;
+  }
+  .extended-accordion-header.open svg {
+    transform: rotate(180deg);
+  }
+  .extended-accordion-body {
+    display: none;
+    padding: 14px 16px;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 1px solid var(--border-color);
+  }
+
   .btn {
-    padding: 10px 20px;
+    padding: 9px 18px;
     border-radius: 12px;
     border: none;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     transition: all 0.2s ease;
   }
   .btn:disabled {
@@ -874,16 +1219,25 @@ UI_HTML = """
   .btn-secondary:hover:not(:disabled) {
     border-color: var(--primary);
   }
+  .btn-danger {
+    background: rgba(217, 83, 79, 0.12);
+    color: #d9534f;
+    border: 1px solid rgba(217, 83, 79, 0.3);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: #d9534f;
+    color: #fff;
+  }
 
   .form-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 6px;
-    padding-top: 16px;
+    margin-top: 4px;
+    padding-top: 14px;
     border-top: 1px solid var(--border-color);
   }
-  .save-group { display: flex; gap: 10px; }
+  .action-buttons-group { display: flex; gap: 8px; }
 
   .online-results-section {
     display: none;
@@ -907,10 +1261,7 @@ UI_HTML = """
     align-items: center;
     gap: 8px;
   }
-  .view-toggles {
-    display: flex;
-    gap: 6px;
-  }
+  .view-toggles { display: flex; gap: 6px; }
 
   .results-grid.view-grid {
     display: grid;
@@ -969,13 +1320,8 @@ UI_HTML = """
     border-radius: 10px;
     object-fit: cover;
   }
-  .results-grid.view-list .result-details {
-    flex: 1;
-  }
-  .results-grid.view-list .result-buttons {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
+  .results-grid.view-list .result-details { flex: 1; }
+  .results-grid.view-list .result-buttons { flex-direction: row; flex-wrap: wrap; }
 
   .result-details h4 {
     font-size: 0.95rem;
@@ -1180,15 +1526,64 @@ UI_HTML = """
   .copy-btn:hover { color: var(--primary); background: rgba(255, 119, 0, 0.1); }
   .copy-btn.copied { color: #28a745 !important; }
 
+  /* استایل تولبار و تب‌های ترجمه */
+  .lyrics-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    background: var(--input-bg);
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+  }
+  .lyrics-tabs {
+    display: flex;
+    gap: 6px;
+  }
+  .lyrics-tab-btn {
+    padding: 5px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .lyrics-tab-btn:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+  .lyrics-tab-btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .lyrics-trans-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lyrics-trans-select {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-main);
+  }
   .lyrics-content-box {
     background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 14px;
     padding: 16px 20px;
-    max-height: 360px;
+    max-height: 380px;
     overflow-y: auto;
     white-space: pre-wrap;
-    line-height: 1.8;
+    line-height: 1.85;
     font-size: 0.95rem;
     color: var(--text-main);
     user-select: text !important;
@@ -1233,7 +1628,6 @@ UI_HTML = """
     accent-color: var(--primary);
   }
 
-  /* نوار اعلان آپدیت در تنظیمات */
   .update-section-box {
     display: flex;
     flex-direction: column;
@@ -1330,7 +1724,6 @@ UI_HTML = """
       <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;" data-i18n="dropSubtext">Automatic online search, modern tag editor and full media player</div>
     </div>
 
-    <!-- نوار نام فایل در حال ویرایش با قابلیت کپی مستقیم -->
     <div class="loaded-filename-bar" id="loadedFilenameBar">
       <div class="loaded-filename-inner">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -1355,24 +1748,53 @@ UI_HTML = """
 
     <div class="editor-grid" id="editorGrid">
       <div class="left-panel">
-        <div class="cover-card" id="coverCard" onclick="triggerPickCover()">
-          <img id="coverImage" src="" alt="Album Cover" style="display: none;">
-          <div class="cover-placeholder" id="coverPlaceholder">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#a0a8b4" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-            <span data-i18n="chooseCover">Choose Album Cover</span>
-          </div>
-          <div class="cover-overlay">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-            <span data-i18n="changeCover">Change & Crop Cover</span>
-          </div>
-        </div>
+        <div class="cover-box-container">
+          <div class="cover-card" id="coverCard">
+            <span class="cover-type-tag" id="coverTypeBadge">Front Cover (Main)</span>
+            <img id="coverImage" src="" alt="Album Cover" style="display: none;">
+            
+            <div class="cover-placeholder" id="coverPlaceholder" onclick="triggerAddCover(3)">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#a0a8b4" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              <span data-i18n="chooseCover">Choose Album Cover</span>
+            </div>
 
-        <div class="player-card">
-          <audio id="audioPlayer" controls preload="auto"></audio>
+            <div class="cover-overlay" id="coverOverlay">
+              <button class="cover-action-circle-btn" title="Change & Crop" onclick="triggerEditCurrentCover()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              </button>
+              <button class="cover-action-circle-btn btn-delete" title="Delete Cover" onclick="deleteCurrentCover()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="covers-thumbnails-strip" id="coversThumbsStrip"></div>
         </div>
       </div>
 
       <div class="right-panel">
+        <div class="custom-audio-player" id="customAudioPlayer">
+          <audio id="audioElement" preload="auto"></audio>
+          <button class="player-play-btn" id="playerPlayBtn" onclick="togglePlayAudio()">
+            <svg id="playBtnIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          </button>
+          
+          <div class="player-timeline-box">
+            <div class="player-progress-bar-wrap" id="playerProgressWrap" onclick="seekAudio(event)">
+              <div class="player-progress-current" id="playerProgressFill"></div>
+            </div>
+            <div class="player-time-display">
+              <span id="playerCurrentTime">00:00</span>
+              <span id="playerTotalTime">00:00</span>
+            </div>
+          </div>
+
+          <div class="player-vol-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <input type="range" class="player-vol-slider" min="0" max="1" step="0.05" value="1" oninput="changeVolume(this.value)">
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label data-i18n="lblTitle">Title</label>
@@ -1422,8 +1844,45 @@ UI_HTML = """
         </div>
 
         <div class="form-group">
-          <label data-i18n="lblComment">Comment / Lyrics</label>
+          <label data-i18n="lblComment">Comment</label>
           <input type="text" class="form-control" id="inputComment" oninput="handleFieldChange()">
+        </div>
+
+        <div class="extended-tags-accordion">
+          <div class="extended-accordion-header" id="accordionToggleBtn" onclick="toggleExtendedTagsAccordion()">
+            <span data-i18n="lblOtherTags">Extended / Other Tags (Publisher, Lyrics, Mood, ...)</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="extended-accordion-body" id="accordionBody">
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="lblPublisher">Publisher / Label</label>
+                <input type="text" class="form-control" id="inputPublisher" oninput="handleFieldChange()">
+              </div>
+              <div class="form-group">
+                <label data-i18n="lblMood">Mood</label>
+                <input type="text" class="form-control" id="inputMood" oninput="handleFieldChange()">
+              </div>
+            </div>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+              <div class="form-group">
+                <label data-i18n="lblBpm">BPM</label>
+                <input type="text" class="form-control" id="inputBpm" oninput="handleFieldChange()">
+              </div>
+              <div class="form-group">
+                <label data-i18n="lblOrigArtist">Original Artist</label>
+                <input type="text" class="form-control" id="inputOriginalArtist" oninput="handleFieldChange()">
+              </div>
+              <div class="form-group">
+                <label data-i18n="lblIsrc">ISRC</label>
+                <input type="text" class="form-control" id="inputIsrc" oninput="handleFieldChange()">
+              </div>
+            </div>
+            <div class="form-group">
+              <label data-i18n="lblLyrics">Unsynchronized Lyrics</label>
+              <textarea class="form-control" id="inputLyrics" rows="4" style="resize: vertical;" oninput="handleFieldChange()"></textarea>
+            </div>
+          </div>
         </div>
 
         <div class="form-actions">
@@ -1432,14 +1891,19 @@ UI_HTML = """
             <span id="txtOnlineSearch" data-i18n="btnSearchOnline">Search Online Metadata</span>
           </button>
 
-          <div class="save-group">
+          <div class="action-buttons-group">
+            <button class="btn btn-danger" id="btnClearAll" onclick="openClearAllModal()" title="Clear All Tags">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span data-i18n="btnClearAll">Clear All</span>
+            </button>
+
             <button class="btn btn-secondary" id="btnReset" onclick="promptResetTags()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
               <span data-i18n="btnReset">Reset</span>
             </button>
 
             <button class="btn btn-primary" id="btnSave" disabled onclick="saveTags()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
               <span data-i18n="btnSave">Save Tags</span>
             </button>
           </div>
@@ -1468,7 +1932,43 @@ UI_HTML = """
     </div>
   </div>
 
-  <!-- مدال جزئیات انتشار آهنگ -->
+  <div class="modal-backdrop" id="coverTypeModal">
+    <div class="modal-dialog" style="width: 440px;">
+      <h3 style="font-weight: 700; font-size: 1.15rem;" data-i18n="chooseCoverTypeTitle">Select Cover Type</h3>
+      <p style="font-size: 0.88rem; color: var(--text-muted);" data-i18n="chooseCoverTypeDesc">Select the image type you want to add to this audio file:</p>
+      
+      <div class="form-group">
+        <select class="form-control" id="selectNewCoverType"></select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+        <button class="btn btn-outline" onclick="closeCoverTypeModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" onclick="proceedToPickCoverFile()" data-i18n="btnContinue">Continue & Browse</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="clearAllModal">
+    <div class="modal-dialog" style="width: 460px;">
+      <h3 style="font-weight: 700; font-size: 1.15rem; color: #d9534f;" data-i18n="clearAllModalTitle">Clear All Tags</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.6;" data-i18n="clearAllModalDesc">
+        All metadata fields in this file will be cleared. Are you sure you want to proceed?
+      </p>
+      
+      <div class="settings-option" style="border: none; padding-bottom: 0;">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkDeleteCovers">
+          <span style="color: #d9534f; font-weight: 600;" data-i18n="chkDeleteCovers">Also remove all embedded covers</span>
+        </label>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+        <button class="btn btn-outline" onclick="closeClearAllModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" style="background: #d9534f;" onclick="performClearAllTags()" data-i18n="btnConfirmClear">Clear Tags</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="detailModal">
     <div class="modal-dialog">
       <h3 style="font-weight: 700; font-size: 1.15rem;" data-i18n="detailsTitle">Release Details</h3>
@@ -1494,18 +1994,39 @@ UI_HTML = """
     </div>
   </div>
 
-  <!-- مدال متن ترانه (Lyrics) -->
+  <!-- مدال متن ترانه (Lyrics) به همراه ترجمه آنلاین، تب‌های ترکیبی و زبان‌ها -->
   <div class="modal-backdrop" id="lyricsModal">
-    <div class="modal-dialog" style="width: 620px;">
+    <div class="modal-dialog" style="width: 680px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <h3 style="font-weight: 700; font-size: 1.15rem; color: var(--accent-purple);" id="lyricsModalTitle">Song Lyrics</h3>
         <button class="icon-btn" id="btnCopyAllLyrics" title="Copy Lyrics" onclick="copyLyricsText(this)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         </button>
       </div>
+
+      <div class="lyrics-toolbar">
+        <div class="lyrics-tabs">
+          <button class="lyrics-tab-btn active" id="tabLyricsCombined" onclick="switchLyricsTab('combined')" data-i18n="tabCombined">Original + Translation</button>
+          <button class="lyrics-tab-btn" id="tabLyricsTrans" onclick="switchLyricsTab('translated')" data-i18n="tabTranslated">Translation Only</button>
+          <button class="lyrics-tab-btn" id="tabLyricsOrig" onclick="switchLyricsTab('original')" data-i18n="tabOriginal">Original Only</button>
+        </div>
+
+        <div class="lyrics-trans-controls">
+          <select class="lyrics-trans-select" id="selectLyricsLang" onchange="translateCurrentLyrics()">
+            <option value="fa">فارسی (FA)</option>
+            <option value="en">English (EN)</option>
+          </select>
+          <button class="btn-sm" id="btnDoTranslate" onclick="translateCurrentLyrics()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            <span data-i18n="btnTranslate">Translate</span>
+          </button>
+        </div>
+      </div>
+
       <div class="lyrics-content-box" id="lyricsContentBox"></div>
+      
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
-        <button class="btn btn-outline" onclick="applyLyricsToComment()" data-i18n="btnApplyLyricsToComment">Set as Track Comment</button>
+        <button class="btn btn-outline" onclick="applyLyricsToComment()" data-i18n="btnApplyLyricsToComment">Set as Track Comment & Lyrics</button>
         <button class="btn btn-primary" onclick="closeLyricsModal()" data-i18n="btnClose">Close</button>
       </div>
     </div>
@@ -1515,7 +2036,6 @@ UI_HTML = """
     <img id="lightboxImg" src="" alt="Enlarged Cover">
   </div>
 
-  <!-- مدال تنظیمات با دکمه‌های بررسی آپدیت و انصراف -->
   <div class="modal-backdrop" id="settingsModal">
     <div class="modal-dialog">
       <h3 style="font-weight: 700; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
@@ -1556,7 +2076,6 @@ UI_HTML = """
         </div>
       </div>
 
-      <!-- بخش آپدیت و بررسی نسخه -->
       <div class="update-section-box">
         <div class="update-status-row">
           <div class="update-info-text">
@@ -1639,11 +2158,19 @@ UI_HTML = """
 
   <script>
     let currentFilePath = "";
-    let currentCoverDataUrl = "";
     let isModified = false;
     let cachedInitialTags = null;
+    let cachedInitialCovers = [];
+    let currentCovers = [];
+    let activeCoverIndex = -1;
+    let pendingNewCoverType = 3;
+
     let currentSelectedDetailItem = null;
-    let cachedFetchedLyrics = "";
+    let cachedOrigLyrics = "";
+    let cachedTransLyrics = "";
+    let cachedCombinedLyrics = "";
+    let currentLyricsTab = "combined";
+
     let latestDownloadUrl = "";
     let lastCheckedTimestamp = null;
 
@@ -1654,6 +2181,19 @@ UI_HTML = """
     let isDraggingCrop = false;
     let dragStartX = 0, dragStartY = 0;
 
+    const APIC_TYPE_NAMES = {
+      3: "Front Cover (Main)",
+      4: "Back Cover",
+      7: "Lead Artist / Performer",
+      11: "Composer",
+      9: "Band / Orchestra",
+      12: "Lyricist",
+      15: "Recording Location",
+      14: "Illustration",
+      19: "Artist Logo",
+      20: "Publisher / Studio Logo"
+    };
+
     const translations = {
       en: {
         btnAbout: "About",
@@ -1663,7 +2203,7 @@ UI_HTML = """
         nonMp3Notice: "This is not an MP3 file; convert to MP3 to edit tags.",
         btnConvert: "Convert to MP3",
         chooseCover: "Choose Album Cover",
-        changeCover: "Change & Crop Cover",
+        changeCover: "Change & Crop",
         lblTitle: "Title",
         lblArtist: "Artist",
         lblAlbum: "Album",
@@ -1673,10 +2213,25 @@ UI_HTML = """
         lblTrack: "Track #",
         lblDisc: "Disc #",
         lblCopyright: "Copyright",
-        lblComment: "Comment / Lyrics",
+        lblComment: "Comment",
+        lblOtherTags: "Extended / Other Tags (Publisher, Lyrics, Mood, ...)",
+        lblPublisher: "Publisher / Label",
+        lblMood: "Mood",
+        lblBpm: "BPM",
+        lblOrigArtist: "Original Artist",
+        lblIsrc: "ISRC",
+        lblLyrics: "Unsynchronized Lyrics",
         btnSearchOnline: "Search Online Metadata",
         btnReset: "Reset",
         btnSave: "Save Tags",
+        btnClearAll: "Clear All",
+        clearAllModalTitle: "Clear All Tags",
+        clearAllModalDesc: "All metadata fields in this file will be cleared. Are you sure you want to proceed?",
+        chkDeleteCovers: "Also remove all embedded covers",
+        btnConfirmClear: "Clear Tags",
+        chooseCoverTypeTitle: "Select Cover Type",
+        chooseCoverTypeDesc: "Select the image type you want to add to this audio file:",
+        btnContinue: "Continue & Browse",
         onlineMatches: "Online Matches (Up to 10 releases)",
         detailsTitle: "Release Details",
         btnClose: "Close",
@@ -1700,12 +2255,12 @@ UI_HTML = """
         aboutDev: "Developer: Hadi Dastangoo",
         searching: "Searching online...",
         copied: "Copied to clipboard!",
-        savedSuccess: "Tags and cover saved successfully.",
+        savedSuccess: "Tags and covers saved successfully.",
         applyTags: "Set Tags",
         applyCover: "Set Cover",
         applyAll: "Set Tags & Cover",
         viewLyrics: "Lyrics",
-        btnApplyLyricsToComment: "Set as Track Comment",
+        btnApplyLyricsToComment: "Set as Track Comment & Lyrics",
         lyricsTitle: "Lyrics",
         noLyricsFound: "No lyrics found for this track online.",
         fetchingLyrics: "Fetching lyrics...",
@@ -1717,17 +2272,23 @@ UI_HTML = """
         btnDownload: "Download",
         lastCheckedNever: "Last checked: Never",
         lastCheckedPrefix: "Last checked: ",
-        noInternet: "Unable to connect to the internet. Please check your network connection."
+        noInternet: "Unable to connect to the internet. Please check your network connection.",
+        allCoversAdded: "All supported cover types are already added.",
+        tabCombined: "Original + Translation",
+        tabTranslated: "Translation Only",
+        tabOriginal: "Original Only",
+        btnTranslate: "Translate",
+        translating: "Translating..."
       },
       fa: {
         btnAbout: "درباره برنامه",
         dropText: "فایل صوتی یا تصویری (MP4, MP3, ...) را اینجا بکشید یا کلیک کنید",
-        dropSubtext: "ویرایشگر تمامی تگ‌های ID3، پشتیبانی از کاور مربعی و پلیر استریم مستقیم",
+        dropSubtext: "ویرایشگر تمامی تگ‌های ID3، پشتیبانی از کاورهای چندگانه و پلیر مدرن",
         lblCurrentFile: "فایل بارگذاری‌شده:",
         nonMp3Notice: "این فایل MP3 نیست؛ برای ویرایش تگ‌ها تبدیل به MP3 الزامی است.",
         btnConvert: "تبدیل به MP3",
         chooseCover: "انتخاب کاور آهنگ (کلیک کنید)",
-        changeCover: "برش و تغییر کاور",
+        changeCover: "برش و تغییر",
         lblTitle: "عنوان آهنگ (Title)",
         lblArtist: "هنرمند / خواننده (Artist)",
         lblAlbum: "آلبوم (Album)",
@@ -1737,10 +2298,25 @@ UI_HTML = """
         lblTrack: "شماره ترک (Track)",
         lblDisc: "شماره دیسک (Disc)",
         lblCopyright: "کپی‌رایت (Copyright)",
-        lblComment: "توضیحات یا متن (Comment)",
+        lblComment: "توضیحات (Comment)",
+        lblOtherTags: "سایر تگ‌ها / فیلدهای پیشرفته (ناشر، شعر، حس‌وحال و...)",
+        lblPublisher: "ناشر / لیبل (Publisher)",
+        lblMood: "حس و حال (Mood)",
+        lblBpm: "تمپو / ضرب‌آهنگ (BPM)",
+        lblOrigArtist: "خواننده اصلی (Original Artist)",
+        lblIsrc: "شناسه استاندارد ISRC",
+        lblLyrics: "متن کامل ترانه (Unsynchronized Lyrics)",
         btnSearchOnline: "جستجوی آنلاین اطلاعات آهنگ",
         btnReset: "بازنشانی",
         btnSave: "ذخیره اطلاعات آهنگ",
+        btnClearAll: "حذف تمام تگ‌ها",
+        clearAllModalTitle: "حذف کامل تمام متادیتاها",
+        clearAllModalDesc: "تمامی مقادیر تگ‌ها در این فایل پاک خواهند شد. آیا از انجام این کار اطمینان دارید؟",
+        chkDeleteCovers: "حذف تمامی کاورها و تصاویر فایل صوتی",
+        btnConfirmClear: "پاکسازی تمام تگ‌ها",
+        chooseCoverTypeTitle: "انتخاب نوع کاور جدید",
+        chooseCoverTypeDesc: "نوع تصویری که می‌خواهید به فایل صوتی اضافه کنید را انتخاب کنید:",
+        btnContinue: "ادامه و انتخاب فایل",
         onlineMatches: "نتایج هوشمند آنلاین (تا ۱۰ مورد مشابه)",
         detailsTitle: "جزئیات انتشار آهنگ",
         btnClose: "بستن",
@@ -1764,7 +2340,7 @@ UI_HTML = """
         aboutDev: "توسعه‌دهنده: هادی داستانگو",
         searching: "در حال جستجو...",
         copied: "در حافظه کپی شد!",
-        savedSuccess: "تگ‌ها و کاور با موفقیت ذخیره شدند.",
+        savedSuccess: "تگ‌ها و کاورها با موفقیت ذخیره شدند.",
         applyTags: "تنظیم اطلاعات",
         applyCover: "تنظیم کاور",
         applyAll: "تنظیم اطلاعات و کاور",
@@ -1781,7 +2357,13 @@ UI_HTML = """
         btnDownload: "دانلود نسخه جدید",
         lastCheckedNever: "آخرین بررسی: هنوز انجام نشده",
         lastCheckedPrefix: "آخرین بررسی: ",
-        noInternet: "امکان برقراری ارتباط با وب وجود ندارد. لطفاً اتصال اینترنت خود را بررسی نمایید."
+        noInternet: "امکان برقراری ارتباط با وب وجود ندارد. لطفاً اتصال اینترنت خود را بررسی نمایید.",
+        allCoversAdded: "تمام انواع مجاز کاور قبلاً اضافه شده‌اند.",
+        tabCombined: "متن و ترجمه (ترکیبی)",
+        tabTranslated: "فقط ترجمه",
+        tabOriginal: "فقط متن اصلی",
+        btnTranslate: "ترجمه متن",
+        translating: "در حال ترجمه..."
       }
     };
 
@@ -1801,6 +2383,7 @@ UI_HTML = """
       if (lastCheckedTimestamp) {
         formatAndDisplayLastChecked(lastCheckedTimestamp);
       }
+      renderCoversStrip();
     }
 
     function applyTheme(theme) {
@@ -1830,38 +2413,28 @@ UI_HTML = """
       if (res) renderFileState(res);
     }
 
-    // ----------------- بستن تمام مدال‌ها با کلیک روی فضای بیرونی -----------------
-    const allModals = ['detailModal', 'lyricsModal', 'settingsModal', 'confirmResetModal', 'cropModal', 'aboutModal'];
+    const allModals = ['detailModal', 'lyricsModal', 'settingsModal', 'confirmResetModal', 'cropModal', 'aboutModal', 'clearAllModal', 'coverTypeModal'];
     allModals.forEach(modalId => {
       const modalEl = document.getElementById(modalId);
       if (modalEl) {
         modalEl.addEventListener('click', (e) => {
-          if (e.target === modalEl) {
-            modalEl.style.display = 'none';
-          }
+          if (e.target === modalEl) modalEl.style.display = 'none';
         });
       }
     });
 
-    // ----------------- پیاده‌سازی کامل Drag & Drop -----------------
     const dropZone = document.getElementById('dropZone');
-    
     ['dragenter', 'dragover'].forEach(eventName => {
-      window.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
+      window.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); });
       dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         dropZone.classList.add('dragover');
       });
     });
 
     ['dragleave', 'dragend'].forEach(eventName => {
       dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         dropZone.classList.remove('dragover');
       });
     });
@@ -1903,7 +2476,8 @@ UI_HTML = """
       } else if (res.status === 'ready_mp3') {
         document.getElementById('conversionBanner').style.display = 'none';
         cachedInitialTags = JSON.parse(JSON.stringify(res.tags));
-        loadMp3IntoEditor(res.file_path, res.tags, res.audio_data);
+        cachedInitialCovers = JSON.parse(JSON.stringify(res.covers || []));
+        loadMp3IntoEditor(res.file_path, res.tags, res.covers || [], res.audio_data);
       }
     }
 
@@ -1926,30 +2500,30 @@ UI_HTML = """
         document.getElementById('conversionBanner').style.display = 'none';
         document.getElementById('displayLoadedFilename').innerText = res.filename;
         cachedInitialTags = JSON.parse(JSON.stringify(res.tags));
-        loadMp3IntoEditor(res.file_path, res.tags, res.audio_data);
+        cachedInitialCovers = JSON.parse(JSON.stringify(res.covers || []));
+        loadMp3IntoEditor(res.file_path, res.tags, res.covers || [], res.audio_data);
         showToast((currentLang === "fa") ? "تبدیل با موفقیت انجام شد." : "Conversion complete.");
       } else {
         showToast(res.message, true);
       }
     }
 
-    function loadMp3IntoEditor(filePath, tags, audioDataUrl) {
+    function loadMp3IntoEditor(filePath, tags, covers, audioDataUrl) {
       currentFilePath = filePath;
       document.getElementById('editorGrid').style.display = 'grid';
 
-      const player = document.getElementById('audioPlayer');
+      const audioEl = document.getElementById('audioElement');
       if (audioDataUrl) {
-        player.src = audioDataUrl;
-        player.load();
+        audioEl.src = audioDataUrl;
+        audioEl.load();
       }
 
       fillInputFields(tags);
 
-      if (tags.cover_base64) {
-        setCoverImage(tags.cover_base64);
-      } else {
-        removeCoverImage();
-      }
+      currentCovers = JSON.parse(JSON.stringify(covers));
+      activeCoverIndex = currentCovers.length > 0 ? 0 : -1;
+      renderCoversStrip();
+      updateCoverDisplay();
 
       isModified = false;
       document.getElementById('btnSave').disabled = true;
@@ -1971,6 +2545,13 @@ UI_HTML = """
       document.getElementById('inputDisc').value = tags.disc || "";
       document.getElementById('inputCopyright').value = tags.copyright || "";
       document.getElementById('inputComment').value = tags.comment || "";
+
+      document.getElementById('inputPublisher').value = tags.publisher || "";
+      document.getElementById('inputMood').value = tags.mood || "";
+      document.getElementById('inputBpm').value = tags.bpm || "";
+      document.getElementById('inputOriginalArtist').value = tags.original_artist || "";
+      document.getElementById('inputIsrc').value = tags.isrc || "";
+      document.getElementById('inputLyrics').value = tags.lyrics || "";
     }
 
     function handleFieldChange() {
@@ -1985,22 +2566,132 @@ UI_HTML = """
       document.getElementById('btnOnlineSearch').disabled = (title === "" && artist === "");
     }
 
-    function setCoverImage(dataUrl) {
-      currentCoverDataUrl = dataUrl;
+    function toggleExtendedTagsAccordion() {
+      const header = document.getElementById('accordionToggleBtn');
+      const body = document.getElementById('accordionBody');
+      const isOpen = header.classList.toggle('open');
+      body.style.display = isOpen ? 'flex' : 'none';
+    }
+
+    function renderCoversStrip() {
+      const strip = document.getElementById('coversThumbsStrip');
+      strip.innerHTML = "";
+
+      currentCovers.forEach((cov, idx) => {
+        const item = document.createElement('div');
+        item.className = 'thumb-item' + (idx === activeCoverIndex ? ' active' : '');
+        item.title = cov.type_name || APIC_TYPE_NAMES[cov.type] || `Type ${cov.type}`;
+        item.onclick = () => selectCoverIndex(idx);
+        item.innerHTML = `<img src="${cov.dataUrl}" alt="Cover ${idx}">`;
+        strip.appendChild(item);
+      });
+
+      const availableTypes = Object.keys(APIC_TYPE_NAMES).filter(t => !currentCovers.some(c => c.type == t));
+      if (availableTypes.length > 0) {
+        const addBtn = document.createElement('div');
+        addBtn.className = 'thumb-add-btn';
+        addBtn.title = (currentLang === 'fa') ? "افزودن کاور جدید" : "Add Cover";
+        addBtn.onclick = openAddCoverTypeModal;
+        addBtn.innerHTML = `
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>${(currentLang === 'fa') ? 'کاور جدید' : 'Add'}</span>
+        `;
+        strip.appendChild(addBtn);
+      }
+    }
+
+    function selectCoverIndex(idx) {
+      if (idx >= 0 && idx < currentCovers.length) {
+        activeCoverIndex = idx;
+        renderCoversStrip();
+        updateCoverDisplay();
+      }
+    }
+
+    function updateCoverDisplay() {
       const img = document.getElementById('coverImage');
-      img.src = dataUrl;
-      img.style.display = 'block';
-      document.getElementById('coverPlaceholder').style.display = 'none';
+      const placeholder = document.getElementById('coverPlaceholder');
+      const badge = document.getElementById('coverTypeBadge');
+      const overlay = document.getElementById('coverOverlay');
+
+      if (activeCoverIndex >= 0 && activeCoverIndex < currentCovers.length) {
+        const cov = currentCovers[activeCoverIndex];
+        img.src = cov.dataUrl;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+        badge.innerText = cov.type_name || APIC_TYPE_NAMES[cov.type] || `Type ${cov.type}`;
+        badge.style.display = 'block';
+        overlay.style.display = 'flex';
+      } else {
+        img.src = "";
+        img.style.display = 'none';
+        placeholder.style.display = 'flex';
+        badge.style.display = 'none';
+        overlay.style.display = 'none';
+      }
     }
 
-    function removeCoverImage() {
-      currentCoverDataUrl = "";
-      document.getElementById('coverImage').style.display = 'none';
-      document.getElementById('coverPlaceholder').style.display = 'flex';
-    }
-
-    function triggerPickCover() {
+    function triggerAddCover(typeNum = 3) {
+      pendingNewCoverType = typeNum;
       document.getElementById('coverFileInput').click();
+    }
+
+    function openAddCoverTypeModal() {
+      const select = document.getElementById('selectNewCoverType');
+      select.innerHTML = "";
+      
+      const existingTypes = currentCovers.map(c => parseInt(c.type));
+      let hasAny = false;
+
+      for (const [tCode, tName] of Object.entries(APIC_TYPE_NAMES)) {
+        if (!existingTypes.includes(parseInt(tCode))) {
+          const opt = document.createElement('option');
+          opt.value = tCode;
+          opt.innerText = tName;
+          select.appendChild(opt);
+          hasAny = true;
+        }
+      }
+
+      if (!hasAny) {
+        showToast(translations[currentLang].allCoversAdded, true);
+        return;
+      }
+
+      document.getElementById('coverTypeModal').style.display = 'flex';
+    }
+
+    function closeCoverTypeModal() {
+      document.getElementById('coverTypeModal').style.display = 'none';
+    }
+
+    function proceedToPickCoverFile() {
+      const select = document.getElementById('selectNewCoverType');
+      pendingNewCoverType = parseInt(select.value) || 3;
+      closeCoverTypeModal();
+      document.getElementById('coverFileInput').click();
+    }
+
+    function triggerEditCurrentCover() {
+      if (activeCoverIndex >= 0 && activeCoverIndex < currentCovers.length) {
+        pendingNewCoverType = currentCovers[activeCoverIndex].type;
+        document.getElementById('coverFileInput').click();
+      }
+    }
+
+    function deleteCurrentCover() {
+      if (activeCoverIndex >= 0 && activeCoverIndex < currentCovers.length) {
+        currentCovers.splice(activeCoverIndex, 1);
+        if (currentCovers.length === 0) {
+          activeCoverIndex = -1;
+        } else if (activeCoverIndex >= currentCovers.length) {
+          activeCoverIndex = currentCovers.length - 1;
+        }
+        renderCoversStrip();
+        updateCoverDisplay();
+        handleFieldChange();
+        showToast((currentLang === "fa") ? "کاور حذف گردید؛ دکمه ذخیره را بزنید." : "Cover deleted. Save to apply.");
+      }
     }
 
     function handleCoverFileSelected(e) {
@@ -2065,10 +2756,73 @@ UI_HTML = """
     function applyCrop() {
       const canvas = document.getElementById('cropCanvas');
       const croppedBase64 = canvas.toDataURL('image/jpeg', 0.94);
-      setCoverImage(croppedBase64);
+      
+      const typeNum = pendingNewCoverType || 3;
+      const typeName = APIC_TYPE_NAMES[typeNum] || `Type ${typeNum}`;
+
+      const existingIdx = currentCovers.findIndex(c => c.type == typeNum);
+      const newCoverObj = {
+        type: typeNum,
+        type_name: typeName,
+        mime: "image/jpeg",
+        desc: typeName,
+        dataUrl: croppedBase64
+      };
+
+      if (existingIdx !== -1) {
+        currentCovers[existingIdx] = newCoverObj;
+        activeCoverIndex = existingIdx;
+      } else {
+        currentCovers.push(newCoverObj);
+        activeCoverIndex = currentCovers.length - 1;
+      }
+
+      renderCoversStrip();
+      updateCoverDisplay();
       handleFieldChange();
       closeCropModal();
       showToast((currentLang === "fa") ? "کاور تنظیم شد؛ جهت ذخیره نهایی دکمه ذخیره را بزنید." : "Cover set. Press Save to apply.");
+    }
+
+    function openClearAllModal() {
+      document.getElementById('chkDeleteCovers').checked = false;
+      document.getElementById('clearAllModal').style.display = 'flex';
+    }
+
+    function closeClearAllModal() {
+      document.getElementById('clearAllModal').style.display = 'none';
+    }
+
+    function performClearAllTags() {
+      closeClearAllModal();
+
+      document.getElementById('inputTitle').value = "";
+      document.getElementById('inputArtist').value = "";
+      document.getElementById('inputAlbum').value = "";
+      document.getElementById('inputGenre').value = "";
+      document.getElementById('inputComposer').value = "";
+      document.getElementById('inputYear').value = "";
+      document.getElementById('inputTrack').value = "";
+      document.getElementById('inputDisc').value = "";
+      document.getElementById('inputCopyright').value = "";
+      document.getElementById('inputComment').value = "";
+      document.getElementById('inputPublisher').value = "";
+      document.getElementById('inputMood').value = "";
+      document.getElementById('inputBpm').value = "";
+      document.getElementById('inputOriginalArtist').value = "";
+      document.getElementById('inputIsrc').value = "";
+      document.getElementById('inputLyrics').value = "";
+
+      const deleteCovers = document.getElementById('chkDeleteCovers').checked;
+      if (deleteCovers) {
+        currentCovers = [];
+        activeCoverIndex = -1;
+        renderCoversStrip();
+        updateCoverDisplay();
+      }
+
+      handleFieldChange();
+      showToast((currentLang === "fa") ? "تمام تگ‌ها پاک شدند؛ برای نهایی‌شدن ذخیره را بزنید." : "All tags cleared. Save to apply.");
     }
 
     function promptResetTags() {
@@ -2088,15 +2842,66 @@ UI_HTML = """
       if (!cachedInitialTags) return;
 
       fillInputFields(cachedInitialTags);
-      if (cachedInitialTags.cover_base64) {
-        setCoverImage(cachedInitialTags.cover_base64);
-      } else {
-        removeCoverImage();
-      }
+      currentCovers = JSON.parse(JSON.stringify(cachedInitialCovers || []));
+      activeCoverIndex = currentCovers.length > 0 ? 0 : -1;
+      renderCoversStrip();
+      updateCoverDisplay();
+
       isModified = false;
       document.getElementById('btnSave').disabled = true;
       checkSearchBtnState();
       showToast((currentLang === "fa") ? "اطلاعات اولیه آهنگ بازنشانی شد." : "Tags reverted to original.");
+    }
+
+    const audioEl = document.getElementById('audioElement');
+    const playBtn = document.getElementById('playerPlayBtn');
+    const playBtnIcon = document.getElementById('playBtnIcon');
+    const progressFill = document.getElementById('playerProgressFill');
+    const currTimeTxt = document.getElementById('playerCurrentTime');
+    const totalTimeTxt = document.getElementById('playerTotalTime');
+
+    function formatTime(sec) {
+      if (isNaN(sec) || sec < 0) return "00:00";
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function togglePlayAudio() {
+      if (audioEl.paused) {
+        audioEl.play();
+      } else {
+        audioEl.pause();
+      }
+    }
+
+    audioEl.onplay = () => {
+      playBtnIcon.innerHTML = `<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>`;
+    };
+    audioEl.onpause = () => {
+      playBtnIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
+    };
+    audioEl.ontimeupdate = () => {
+      currTimeTxt.innerText = formatTime(audioEl.currentTime);
+      const pct = (audioEl.currentTime / audioEl.duration) * 100 || 0;
+      progressFill.style.width = `${pct}%`;
+    };
+    audioEl.onloadedmetadata = () => {
+      totalTimeTxt.innerText = formatTime(audioEl.duration);
+    };
+
+    function seekAudio(e) {
+      const wrap = document.getElementById('playerProgressWrap');
+      const rect = wrap.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
+      if (audioEl.duration) {
+        audioEl.currentTime = pct * audioEl.duration;
+      }
+    }
+
+    function changeVolume(val) {
+      audioEl.volume = parseFloat(val);
     }
 
     async function searchOnline() {
@@ -2193,7 +2998,23 @@ UI_HTML = """
         showToast((currentLang === "fa") ? "در حال دریافت کاور باکیفیت..." : "Fetching high-res cover...");
         const res = await window.pywebview.api.fetch_image_base64(item.artwork_url);
         if (res.status === 'success') {
-          setCoverImage(res.dataUrl);
+          const frontIdx = currentCovers.findIndex(c => c.type == 3);
+          const newFront = {
+            type: 3,
+            type_name: APIC_TYPE_NAMES[3],
+            mime: "image/jpeg",
+            desc: "Front Cover (Main)",
+            dataUrl: res.dataUrl
+          };
+          if (frontIdx !== -1) {
+            currentCovers[frontIdx] = newFront;
+            activeCoverIndex = frontIdx;
+          } else {
+            currentCovers.unshift(newFront);
+            activeCoverIndex = 0;
+          }
+          renderCoversStrip();
+          updateCoverDisplay();
           handleFieldChange();
           showToast((currentLang === "fa") ? "کاور اعمال گردید." : "Cover set successfully.");
         } else if (res.status === 'no_internet') {
@@ -2250,7 +3071,6 @@ UI_HTML = """
 
     function copyTextWithFeedback(text, btnElement) {
       const originalSvg = btnElement.innerHTML;
-      
       const doSuccess = () => {
         btnElement.classList.add('copied');
         btnElement.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
@@ -2285,6 +3105,7 @@ UI_HTML = """
       document.body.removeChild(textArea);
     }
 
+    // ----------------- مدیریت متن ترانه و ترجمه آنلاین با MyMemory -----------------
     async function showLyricsModal(index) {
       const item = window.cachedOnlineItems[index];
       if (!item) return;
@@ -2297,16 +3118,74 @@ UI_HTML = """
       box.innerText = translations[currentLang].fetchingLyrics;
       modal.style.display = 'flex';
 
+      cachedOrigLyrics = "";
+      cachedTransLyrics = "";
+      cachedCombinedLyrics = "";
+      currentLyricsTab = "combined";
+
+      const selectLang = document.getElementById('selectLyricsLang');
+      selectLang.value = (currentLang === "fa") ? "fa" : "en";
+
       const res = await window.pywebview.api.fetch_lyrics(item.title, item.artist);
       if (res.status === 'success') {
-        cachedFetchedLyrics = res.lyrics;
-        box.innerText = res.lyrics;
+        cachedOrigLyrics = res.lyrics;
+        await translateCurrentLyrics(true);
       } else if (res.status === 'no_internet') {
         box.innerText = translations[currentLang].noInternet;
       } else {
-        cachedFetchedLyrics = "";
         box.innerText = translations[currentLang].noLyricsFound;
       }
+    }
+
+    async function translateCurrentLyrics(isInitial = false) {
+      if (!cachedOrigLyrics) return;
+
+      const targetLang = document.getElementById('selectLyricsLang').value;
+      const box = document.getElementById('lyricsContentBox');
+      const btn = document.getElementById('btnDoTranslate');
+
+      btn.disabled = true;
+      btn.innerText = translations[currentLang].translating;
+
+      if (!isInitial) {
+        box.innerText = translations[currentLang].translating;
+      }
+
+      const res = await window.pywebview.api.translate_lyrics(cachedOrigLyrics, targetLang);
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg> <span>${translations[currentLang].btnTranslate}</span>`;
+
+      if (res.status === 'success') {
+        cachedTransLyrics = res.translated_text;
+        cachedCombinedLyrics = res.combined_text;
+        displayActiveLyricsTab();
+      } else {
+        cachedTransLyrics = "";
+        cachedCombinedLyrics = "";
+        switchLyricsTab('original');
+        showToast((res.status === 'no_internet') ? translations[currentLang].noInternet : "Translation error.", true);
+      }
+    }
+
+    function switchLyricsTab(tabName) {
+      currentLyricsTab = tabName;
+      document.getElementById('tabLyricsCombined').classList.toggle('active', tabName === 'combined');
+      document.getElementById('tabLyricsTrans').classList.toggle('active', tabName === 'translated');
+      document.getElementById('tabLyricsOrig').classList.toggle('active', tabName === 'original');
+      displayActiveLyricsTab();
+    }
+
+    function displayActiveLyricsTab() {
+      const box = document.getElementById('lyricsContentBox');
+      let textToShow = "";
+      if (currentLyricsTab === 'combined') {
+        textToShow = cachedCombinedLyrics || cachedOrigLyrics;
+      } else if (currentLyricsTab === 'translated') {
+        textToShow = cachedTransLyrics || cachedOrigLyrics;
+      } else {
+        textToShow = cachedOrigLyrics;
+      }
+      box.innerText = textToShow;
     }
 
     function closeLyricsModal() {
@@ -2316,17 +3195,20 @@ UI_HTML = """
     function copyLyricsText(btnEl) {
       const box = document.getElementById('lyricsContentBox');
       const text = box.innerText;
-      if (text && text !== translations[currentLang].noLyricsFound && text !== translations[currentLang].fetchingLyrics) {
+      if (text && text !== translations[currentLang].noLyricsFound && text !== translations[currentLang].fetchingLyrics && text !== translations[currentLang].translating) {
         copyTextWithFeedback(text, btnEl);
       }
     }
 
     function applyLyricsToComment() {
-      if (cachedFetchedLyrics) {
-        document.getElementById('inputComment').value = cachedFetchedLyrics;
+      const box = document.getElementById('lyricsContentBox');
+      const activeText = box.innerText.trim();
+      if (activeText && activeText !== translations[currentLang].noLyricsFound) {
+        document.getElementById('inputComment').value = activeText;
+        document.getElementById('inputLyrics').value = activeText;
         handleFieldChange();
         closeLyricsModal();
-        showToast((currentLang === 'fa') ? "شعر در بخش توضیحات قرار گرفت." : "Lyrics set to comment field.");
+        showToast((currentLang === 'fa') ? "متن انتخابی ترانه در تگ‌ها قرار گرفت." : "Lyrics set to tags successfully.");
       }
     }
 
@@ -2380,12 +3262,18 @@ UI_HTML = """
         disc: document.getElementById('inputDisc').value.trim(),
         copyright: document.getElementById('inputCopyright').value.trim(),
         comment: document.getElementById('inputComment').value.trim(),
+        publisher: document.getElementById('inputPublisher').value.trim(),
+        mood: document.getElementById('inputMood').value.trim(),
+        bpm: document.getElementById('inputBpm').value.trim(),
+        original_artist: document.getElementById('inputOriginalArtist').value.trim(),
+        isrc: document.getElementById('inputIsrc').value.trim(),
+        lyrics: document.getElementById('inputLyrics').value.trim()
       };
 
       const btn = document.getElementById('btnSave');
       btn.disabled = true;
 
-      const res = await window.pywebview.api.save_music_tags(currentFilePath, tags, currentCoverDataUrl);
+      const res = await window.pywebview.api.save_music_tags(currentFilePath, tags, currentCovers);
 
       btn.disabled = false;
       if (res.status === 'success') {
@@ -2401,7 +3289,6 @@ UI_HTML = """
       }
     }
 
-    // ----------------- بخش تنظیمات و بررسی آپدیت -----------------
     async function openSettingsModal() {
       const settings = await window.pywebview.api.get_settings();
       document.getElementById('settingOverwrite').checked = settings.overwrite_original;
@@ -2521,7 +3408,6 @@ UI_HTML = """
         applyLanguage('en');
         applyTheme('system');
       }
-      // بررسی خودکار آپدیت در پس‌زمینه هنگام شروع برنامه
       setTimeout(() => {
         checkAppUpdates(false);
       }, 1500);
@@ -2545,9 +3431,9 @@ def main():
         title=f"{APP_NAME} {APP_VERSION}",
         html=UI_HTML,
         js_api=api,
-        width=1320,
-        height=920,
-        min_size=(1040, 760),
+        width=1340,
+        height=940,
+        min_size=(1060, 780),
         background_color='#f8f9fa'
     )
     api.set_window(window)
