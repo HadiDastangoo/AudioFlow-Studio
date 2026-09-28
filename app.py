@@ -1575,13 +1575,14 @@ UI_HTML = """
     padding: 16px 20px;
     max-height: 380px;
     overflow-y: auto;
-    white-space: pre-wrap;
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    font-family: inherit;
     line-height: 1.85;
     font-size: 0.95rem;
     color: var(--text-main);
     user-select: text !important;
   }
-
   .lightbox-modal {
     display: none;
     position: fixed;
@@ -2015,7 +2016,7 @@ UI_HTML = """
         </div>
       </div>
 
-      <div class="lyrics-content-box" id="lyricsContentBox"></div>
+      <pre class="lyrics-content-box" id="lyricsContentBox"></pre>
       
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
         <button class="btn btn-outline" onclick="applyLyricsToComment()" data-i18n="btnApplyLyricsToComment">Set as Track Comment & Lyrics</button>
@@ -2376,6 +2377,10 @@ UI_HTML = """
         formatAndDisplayLastChecked(lastCheckedTimestamp);
       }
       renderCoversStrip();
+
+      if (window.cachedOnlineItems && window.cachedOnlineItems.length > 0) {
+        renderOnlineResults(window.cachedOnlineItems);
+      }
     }
 
     function applyTheme(theme) {
@@ -2500,10 +2505,27 @@ UI_HTML = """
       }
     }
 
+    function resetAudioPlayer() {
+      const audioEl = document.getElementById('audioElement');
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+        audioEl.src = "";
+      }
+      document.getElementById('playBtnIcon').innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
+      document.getElementById('playerProgressFill').style.width = "0%";
+      document.getElementById('playerCurrentTime').innerText = "00:00";
+      document.getElementById('playerTotalTime').innerText = "00:00";
+    }
+
     function loadMp3IntoEditor(filePath, tags, covers, audioDataUrl) {
       currentFilePath = filePath;
       document.getElementById('editorGrid').style.display = 'grid';
 
+      // ۱. توقف و ریست کامل وضعیت پلیر و تایم‌لاین از آهنگ قبلی
+      resetAudioPlayer();
+
+      // ۲. بارگذاری جریان باینری آهنگ جدید
       const audioEl = document.getElementById('audioElement');
       if (audioDataUrl) {
         audioEl.src = audioDataUrl;
@@ -3107,7 +3129,6 @@ UI_HTML = """
       const box = document.getElementById('lyricsContentBox');
 
       titleEl.innerText = `${item.artist} - ${item.title}`;
-      box.innerText = translations[currentLang].fetchingLyrics;
       modal.style.display = 'flex';
 
       cachedOrigLyrics = "";
@@ -3116,6 +3137,8 @@ UI_HTML = """
 
       switchLyricsTab('original');
       updateTranslationTabsAvailability(false);
+
+      box.innerText = translations[currentLang].fetchingLyrics;
 
       const selectLang = document.getElementById('selectLyricsLang');
       selectLang.value = (currentLang === "fa") ? "fa" : "en";
@@ -3425,6 +3448,20 @@ UI_HTML = """
     window.addEventListener('DOMContentLoaded', () => {
       setTimeout(initSavedSettings, 200);
     });
+
+    const lyricsBox = document.getElementById('lyricsContentBox');
+    if (lyricsBox) {
+      lyricsBox.addEventListener('copy', (e) => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        const selectedText = selection.toString();
+        if (selectedText) {
+          e.clipboardData.setData('text/plain', selectedText);
+          e.preventDefault();
+        }
+      });
+    }
+    
   </script>
 </body>
 </html>
