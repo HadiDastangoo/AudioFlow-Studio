@@ -20,7 +20,7 @@ from mutagen.mp3 import MP3
 
 # ----------------- متغیرهای سراسری برنامه -----------------
 APP_NAME = "AudioFlow Studio"
-APP_VERSION = "v.1.2.1"
+APP_VERSION = "v1.2.1"
 GITHUB_REPO = "HadiDastangoo/AudioFlow-Studio"
 # --------------------------------------------------------
 
@@ -114,6 +114,50 @@ class MusicTaggerAPI:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def get_clipboard_text(self):
+        """دریافت تضمینی متن کلیپ‌بورد از طریق پایتون برای رفع محدودیت امنیتی موتور وب‌ویو"""
+        try:
+            import win32clipboard
+            win32clipboard.OpenClipboard()
+            text = ""
+            if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_UNICODETEXT):
+                text = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
+            win32clipboard.CloseClipboard()
+            return {"status": "success", "text": text}
+        except Exception:
+            try:
+                ps_cmd = 'powershell -Command "Get-Clipboard"'
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                res = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, creationflags=creationflags)
+                return {"status": "success", "text": res.stdout.rstrip("\r\n")}
+            except Exception as e:
+                return {"status": "error", "text": "", "message": str(e)}
+
+    def copy_text_to_clipboard(self, text):
+        """کپی تضمینی متن چندخطی با کاراکترهای شکست خط ویندوز (CRLF) در کلیپ‌بورد سیستم"""
+        if text is None:
+            return {"status": "error", "message": "Text is None"}
+        try:
+            normalized = text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+
+            import win32clipboard
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, normalized)
+            win32clipboard.CloseClipboard()
+            return {"status": "success"}
+        except ImportError:
+            try:
+                b64_bytes = base64.b64encode(normalized.encode('utf-8')).decode('ascii')
+                ps_cmd = f'powershell -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\'{b64_bytes}\')) | Set-Clipboard"'
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                subprocess.run(ps_cmd, shell=True, creationflags=creationflags)
+                return {"status": "success"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
     def check_for_updates(self):
         if not self.is_online():
             return {"status": "no_internet"}
@@ -128,9 +172,13 @@ class MusicTaggerAPI:
                 html_url = data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases")
                 
                 download_url = html_url
+                file_size_str = ""
                 for asset in data.get("assets", []):
                     if asset.get("name", "").endswith(".exe"):
                         download_url = asset.get("browser_download_url", html_url)
+                        size_bytes = asset.get("size", 0)
+                        if size_bytes > 0:
+                            file_size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
                         break
 
                 current_clean = APP_VERSION.lower().replace("v.", "").replace("v", "").strip()
@@ -153,6 +201,7 @@ class MusicTaggerAPI:
                     "latest_version": latest_tag or f"v{latest_clean}",
                     "current_version": APP_VERSION,
                     "download_url": download_url,
+                    "file_size": file_size_str,
                     "release_notes": data.get("body", "")
                 }
             return {"status": "error"}
@@ -666,6 +715,11 @@ UI_HTML = """
     --modal-bg: #1e232b;
     --cover-bg: #16191f;
     --accent-purple-light: rgba(121, 82, 179, 0.2);
+    --player-bg: rgba(255, 255, 255, 0.9);
+    --player-border: #dce2e8;
+  }
+
+  body.theme-dark {
     --player-bg: rgba(25, 30, 38, 0.9);
     --player-border: rgba(255, 255, 255, 0.1);
   }
@@ -1011,7 +1065,6 @@ UI_HTML = """
   }
   .thumb-add-btn span { font-size: 0.68rem; font-weight: 600; }
 
-  /* پلیر مدرن با جهت LTR دائمی و پدینگ ۲۰ پیکسلی برای تراز عمودی دقیق */
   .custom-audio-player {
     direction: ltr !important;
     text-align: left;
@@ -1131,6 +1184,55 @@ UI_HTML = """
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(255, 119, 0, 0.15);
+  }
+
+  input.form-control {
+    direction: ltr !important;
+    text-align: left !important;
+  }
+
+  .custom-context-menu {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    min-width: 170px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(16px);
+    padding: 6px;
+    flex-direction: column;
+    gap: 2px;
+    direction: ltr;
+  }
+  [dir="rtl"] .custom-context-menu {
+    direction: rtl;
+  }
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .context-menu-item:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+  .context-menu-item svg {
+    flex-shrink: 0;
+  }
+  .context-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 6px;
   }
 
   .extended-tags-accordion {
@@ -1519,7 +1621,6 @@ UI_HTML = """
   .copy-btn:hover { color: var(--primary); background: rgba(255, 119, 0, 0.1); }
   .copy-btn.copied { color: #28a745 !important; }
 
-  /* استایل تولبار و تب‌های ترجمه */
   .lyrics-toolbar {
     display: flex;
     align-items: center;
@@ -1625,10 +1726,10 @@ UI_HTML = """
   .update-section-box {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     background: var(--input-bg);
-    padding: 12px 16px;
-    border-radius: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
     border: 1px solid var(--border-color);
   }
   .update-status-row {
@@ -1649,25 +1750,56 @@ UI_HTML = """
   }
   .update-found-banner {
     display: none;
+    flex-direction: column;
+    gap: 10px;
     background: var(--primary-light);
     border: 1px solid rgba(255, 119, 0, 0.35);
-    padding: 10px 14px;
-    border-radius: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
     font-size: 0.86rem;
     color: var(--primary-hover);
+  }
+  .update-banner-header {
+    display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  .update-size-badge {
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: rgba(255, 119, 0, 0.2);
+    color: var(--primary);
+    padding: 2px 7px;
+    border-radius: 6px;
+    margin-inline-start: 6px;
+  }
+  .update-notes-scrollbox {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-main);
+    max-height: 75px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    user-select: text !important;
   }
   .btn-download-update {
     background: var(--primary);
     color: #fff;
     border: none;
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 8px;
     font-size: 0.82rem;
     cursor: pointer;
     font-weight: 600;
     transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
   }
   .btn-download-update:hover { background: var(--primary-hover); }
 
@@ -1792,54 +1924,54 @@ UI_HTML = """
         <div class="form-row">
           <div class="form-group">
             <label data-i18n="lblTitle">Title</label>
-            <input type="text" class="form-control" id="inputTitle" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputTitle" oninput="handleFieldChange()">
           </div>
           <div class="form-group">
             <label data-i18n="lblArtist">Artist</label>
-            <input type="text" class="form-control" id="inputArtist" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputArtist" oninput="handleFieldChange()">
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label data-i18n="lblAlbum">Album</label>
-            <input type="text" class="form-control" id="inputAlbum" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputAlbum" oninput="handleFieldChange()">
           </div>
           <div class="form-group">
             <label data-i18n="lblGenre">Genre</label>
-            <input type="text" class="form-control" id="inputGenre" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputGenre" oninput="handleFieldChange()">
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label data-i18n="lblComposer">Composer</label>
-            <input type="text" class="form-control" id="inputComposer" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputComposer" oninput="handleFieldChange()">
           </div>
           <div class="form-group">
             <label data-i18n="lblYear">Year</label>
-            <input type="text" class="form-control" id="inputYear" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputYear" oninput="handleFieldChange()">
           </div>
         </div>
 
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
           <div class="form-group">
             <label data-i18n="lblTrack">Track #</label>
-            <input type="text" class="form-control" id="inputTrack" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputTrack" oninput="handleFieldChange()">
           </div>
           <div class="form-group">
             <label data-i18n="lblDisc">Disc #</label>
-            <input type="text" class="form-control" id="inputDisc" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputDisc" oninput="handleFieldChange()">
           </div>
           <div class="form-group">
             <label data-i18n="lblCopyright">Copyright</label>
-            <input type="text" class="form-control" id="inputCopyright" oninput="handleFieldChange()">
+            <input type="text" class="form-control input-tag-field" id="inputCopyright" oninput="handleFieldChange()">
           </div>
         </div>
 
         <div class="form-group">
           <label data-i18n="lblComment">Comment</label>
-          <input type="text" class="form-control" id="inputComment" oninput="handleFieldChange()">
+          <input type="text" class="form-control input-tag-field" id="inputComment" oninput="handleFieldChange()">
         </div>
 
         <div class="extended-tags-accordion">
@@ -1851,30 +1983,30 @@ UI_HTML = """
             <div class="form-row">
               <div class="form-group">
                 <label data-i18n="lblPublisher">Publisher / Label</label>
-                <input type="text" class="form-control" id="inputPublisher" oninput="handleFieldChange()">
+                <input type="text" class="form-control input-tag-field" id="inputPublisher" oninput="handleFieldChange()">
               </div>
               <div class="form-group">
                 <label data-i18n="lblMood">Mood</label>
-                <input type="text" class="form-control" id="inputMood" oninput="handleFieldChange()">
+                <input type="text" class="form-control input-tag-field" id="inputMood" oninput="handleFieldChange()">
               </div>
             </div>
             <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
               <div class="form-group">
                 <label data-i18n="lblBpm">BPM</label>
-                <input type="text" class="form-control" id="inputBpm" oninput="handleFieldChange()">
+                <input type="text" class="form-control input-tag-field" id="inputBpm" oninput="handleFieldChange()">
               </div>
               <div class="form-group">
                 <label data-i18n="lblOrigArtist">Original Artist</label>
-                <input type="text" class="form-control" id="inputOriginalArtist" oninput="handleFieldChange()">
+                <input type="text" class="form-control input-tag-field" id="inputOriginalArtist" oninput="handleFieldChange()">
               </div>
               <div class="form-group">
                 <label data-i18n="lblIsrc">ISRC</label>
-                <input type="text" class="form-control" id="inputIsrc" oninput="handleFieldChange()">
+                <input type="text" class="form-control input-tag-field" id="inputIsrc" oninput="handleFieldChange()">
               </div>
             </div>
             <div class="form-group">
               <label data-i18n="lblLyrics">Unsynchronized Lyrics</label>
-              <textarea class="form-control" id="inputLyrics" rows="4" style="resize: vertical;" oninput="handleFieldChange()"></textarea>
+              <textarea class="form-control input-tag-field" id="inputLyrics" rows="4" style="resize: vertical;" oninput="handleFieldChange()"></textarea>
             </div>
           </div>
         </div>
@@ -2083,11 +2215,17 @@ UI_HTML = """
         <div class="update-last-checked" id="txtLastCheckedTime">Last checked: Never</div>
         
         <div class="update-found-banner" id="updateFoundBanner">
-          <div>
-            <strong id="updateFoundTitle">New version available!</strong>
-            <div style="font-size: 0.78rem; opacity: 0.85;" id="updateFoundSub">Download the latest release from GitHub</div>
+          <div class="update-banner-header">
+            <div>
+              <strong id="updateFoundTitle">New version available!</strong>
+              <span class="update-size-badge" id="updateFileSizeBadge"></span>
+            </div>
+            <button class="btn-download-update" id="btnDownloadUpdate" onclick="downloadLatestRelease()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span data-i18n="btnDownload">Download</span>
+            </button>
           </div>
-          <button class="btn-download-update" id="btnDownloadUpdate" onclick="downloadLatestRelease()" data-i18n="btnDownload">Download</button>
+          <div class="update-notes-scrollbox" id="updateReleaseNotesBox" style="display: none;"></div>
         </div>
       </div>
 
@@ -2147,6 +2285,27 @@ UI_HTML = """
     </div>
   </div>
 
+  <!-- منوی راست‌کلیک شناور اختصاصی -->
+  <div class="custom-context-menu" id="inputContextMenu">
+    <div class="context-menu-item" id="ctxItemCut" onclick="execContextMenuAction('cut')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+      <span data-i18n="ctxCut">Cut</span>
+    </div>
+    <div class="context-menu-item" id="ctxItemCopy" onclick="execContextMenuAction('copy')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      <span data-i18n="ctxCopy">Copy</span>
+    </div>
+    <div class="context-menu-item" id="ctxItemPaste" onclick="execContextMenuAction('paste')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+      <span data-i18n="ctxPaste">Paste</span>
+    </div>
+    <div class="context-menu-divider" id="ctxDivider"></div>
+    <div class="context-menu-item" id="ctxItemSelectAll" onclick="execContextMenuAction('selectall')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+      <span data-i18n="ctxSelectAll">Select All</span>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -2173,6 +2332,8 @@ UI_HTML = """
     let cropPanY = 0;
     let isDraggingCrop = false;
     let dragStartX = 0, dragStartY = 0;
+
+    let activeInputTarget = null;
 
     const APIC_TYPE_NAMES = {
       3: "Front Cover (Main)",
@@ -2271,7 +2432,11 @@ UI_HTML = """
         tabTranslated: "Translation",
         tabOriginal: "Original",
         btnTranslate: "Translate",
-        translating: "Translating..."
+        translating: "Translating...",
+        ctxCut: "Cut",
+        ctxCopy: "Copy",
+        ctxPaste: "Paste",
+        ctxSelectAll: "Select All"
       },
       fa: {
         btnAbout: "درباره برنامه",
@@ -2356,7 +2521,11 @@ UI_HTML = """
         tabTranslated: "ترجمه",
         tabOriginal: "متن اصلی",
         btnTranslate: "ترجمه متن",
-        translating: "در حال ترجمه..."
+        translating: "در حال ترجمه...",
+        ctxCut: "برش (Cut)",
+        ctxCopy: "کپی (Copy)",
+        ctxPaste: "جای‌گذاری (Paste)",
+        ctxSelectAll: "انتخاب همه (Select All)"
       }
     };
 
@@ -2454,6 +2623,8 @@ UI_HTML = """
     });
 
     function renderFileState(res) {
+      resetAudioPlayer();
+
       if (res.status === 'error') {
         showToast(res.message, true);
         return;
@@ -2481,7 +2652,7 @@ UI_HTML = """
     function copyCurrentFilename(btnEl) {
       const nameTxt = document.getElementById('displayLoadedFilename').innerText;
       if (nameTxt && nameTxt !== '---') {
-        copyTextWithFeedback(nameTxt, btnEl);
+        smartCopyText(nameTxt, btnEl);
       }
     }
 
@@ -2522,10 +2693,8 @@ UI_HTML = """
       currentFilePath = filePath;
       document.getElementById('editorGrid').style.display = 'grid';
 
-      // ۱. توقف و ریست کامل وضعیت پلیر و تایم‌لاین از آهنگ قبلی
       resetAudioPlayer();
 
-      // ۲. بارگذاری جریان باینری آهنگ جدید
       const audioEl = document.getElementById('audioElement');
       if (audioDataUrl) {
         audioEl.src = audioDataUrl;
@@ -3069,7 +3238,7 @@ UI_HTML = """
             <span class="field-title">${f.key}</span>
             <span class="field-val" title="${f.val}">${f.val}</span>
           </div>
-          <button class="copy-btn" title="Copy" onclick="copyTextWithFeedback('${f.val.replace(/'/g, "\\'")}', this)">
+          <button class="copy-btn" title="Copy" onclick="smartCopyText('${f.val.replace(/'/g, "\\'")}', this)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         `;
@@ -3083,26 +3252,45 @@ UI_HTML = """
       document.getElementById('detailModal').style.display = 'none';
     }
 
-    function copyTextWithFeedback(text, btnElement) {
-      const originalSvg = btnElement.innerHTML;
-      const doSuccess = () => {
+    // ----------------- سیستم کپی هوشمند با حفظ کاراکترهای شکست خط ویندوزی -----------------
+    async function smartCopyText(text, btnElement = null) {
+      if (!text) return;
+      
+      let copiedViaPython = false;
+      try {
+        const res = await window.pywebview.api.copy_text_to_clipboard(text);
+        if (res && res.status === 'success') {
+          copiedViaPython = true;
+        }
+      } catch (err) {}
+
+      if (!copiedViaPython) {
+        // تبدیل امن خطوط بدون نیاز به عبارات منظم خطرساز درون پایتون
+        const normalized = text.split('\\r\\n').join('\\n').split('\\r').join('\\n').split('\\n').join('\\r\\n');
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(normalized);
+          } catch (e) {
+            fallbackCopy(normalized);
+          }
+        } else {
+          fallbackCopy(normalized);
+        }
+      }
+
+      if (btnElement) {
+        const originalSvg = btnElement.innerHTML;
         btnElement.classList.add('copied');
         btnElement.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-        showToast(translations[currentLang].copied);
         setTimeout(() => {
           btnElement.classList.remove('copied');
           btnElement.innerHTML = originalSvg;
         }, 1200);
-      };
-
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(doSuccess).catch(() => fallbackCopy(text, doSuccess));
-      } else {
-        fallbackCopy(text, doSuccess);
       }
+      showToast(translations[currentLang].copied);
     }
 
-    function fallbackCopy(text, onSuccess) {
+    function fallbackCopy(text) {
       const textArea = document.createElement("textarea");
       textArea.value = text;
       textArea.style.position = "fixed";
@@ -3112,10 +3300,7 @@ UI_HTML = """
       textArea.select();
       try {
         document.execCommand('copy');
-        if (onSuccess) onSuccess();
-      } catch (err) {
-        showToast("Copy failed", true);
-      }
+      } catch (err) {}
       document.body.removeChild(textArea);
     }
 
@@ -3227,7 +3412,7 @@ UI_HTML = """
       const box = document.getElementById('lyricsContentBox');
       const text = box.innerText;
       if (text && text !== translations[currentLang].noLyricsFound && text !== translations[currentLang].fetchingLyrics && text !== translations[currentLang].translating) {
-        copyTextWithFeedback(text, btnEl);
+        smartCopyText(text, btnEl);
       }
     }
 
@@ -3393,14 +3578,29 @@ UI_HTML = """
       const badge = document.getElementById('settingsUpdateBadge');
       const banner = document.getElementById('updateFoundBanner');
       const bannerTitle = document.getElementById('updateFoundTitle');
-      const bannerSub = document.getElementById('updateFoundSub');
+      const sizeBadge = document.getElementById('updateFileSizeBadge');
+      const notesBox = document.getElementById('updateReleaseNotesBox');
 
       if (res && res.status === 'success') {
         if (res.has_update) {
           badge.style.display = 'block';
           banner.style.display = 'flex';
           bannerTitle.innerText = `${translations[currentLang].updateAvailable} (${res.latest_version})`;
-          bannerSub.innerText = (currentLang === 'fa') ? "نسخه جدید در گیت‌هاب منتشر شده و آماده دانلود است." : "New update is available on GitHub.";
+          
+          if (res.file_size) {
+            sizeBadge.innerText = res.file_size;
+            sizeBadge.style.display = 'inline-block';
+          } else {
+            sizeBadge.style.display = 'none';
+          }
+
+          if (res.release_notes && res.release_notes.trim()) {
+            notesBox.innerText = res.release_notes.trim();
+            notesBox.style.display = 'block';
+          } else {
+            notesBox.style.display = 'none';
+          }
+
           latestDownloadUrl = res.download_url;
           if (isManual) {
             showToast(`${translations[currentLang].updateAvailable} (${res.latest_version})`);
@@ -3430,6 +3630,128 @@ UI_HTML = """
     function openAboutModal() { document.getElementById('aboutModal').style.display = 'flex'; }
     function closeAboutModal() { document.getElementById('aboutModal').style.display = 'none'; }
 
+    // ----------------- سیستم منوی راست‌کلیک (Context Menu) برای فیلدها و کادر ترانه -----------------
+    const contextMenu = document.getElementById('inputContextMenu');
+    const ctxItemCut = document.getElementById('ctxItemCut');
+    const ctxItemPaste = document.getElementById('ctxItemPaste');
+    const ctxDivider = document.getElementById('ctxDivider');
+
+    document.addEventListener('contextmenu', (e) => {
+      const target = e.target;
+      const isInput = target && target.classList && target.classList.contains('input-tag-field');
+      const isLyricsBox = target && (target.id === 'lyricsContentBox' || target.closest('#lyricsContentBox'));
+
+      if (isInput || isLyricsBox) {
+        e.preventDefault();
+        activeInputTarget = isLyricsBox ? document.getElementById('lyricsContentBox') : target;
+
+        if (isLyricsBox) {
+          ctxItemCut.style.display = 'none';
+          ctxItemPaste.style.display = 'none';
+          ctxDivider.style.display = 'none';
+        } else {
+          ctxItemCut.style.display = 'flex';
+          ctxItemPaste.style.display = 'flex';
+          ctxDivider.style.display = 'block';
+        }
+
+        const menuWidth = 175;
+        const menuHeight = isLyricsBox ? 85 : 155;
+        let posX = e.clientX;
+        let posY = e.clientY;
+
+        if (posX + menuWidth > window.innerWidth) {
+          posX = window.innerWidth - menuWidth - 10;
+        }
+        if (posY + menuHeight > window.innerHeight) {
+          posY = window.innerHeight - menuHeight - 10;
+        }
+
+        contextMenu.style.left = `${posX}px`;
+        contextMenu.style.top = `${posY}px`;
+        contextMenu.style.display = 'flex';
+      } else {
+        contextMenu.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (contextMenu.style.display === 'flex' && !contextMenu.contains(e.target)) {
+        contextMenu.style.display = 'none';
+      }
+    });
+
+    async function execContextMenuAction(action) {
+      if (!activeInputTarget) return;
+      const el = activeInputTarget;
+      contextMenu.style.display = 'none';
+      const isEditableInput = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+
+      if (isEditableInput) {
+        el.focus();
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const val = el.value;
+
+        if (action === 'cut') {
+          if (start !== end) {
+            const selectedText = val.substring(start, end);
+            smartCopyText(selectedText);
+            el.value = val.substring(0, start) + val.substring(end);
+            el.selectionStart = el.selectionEnd = start;
+            handleFieldChange();
+          }
+        } else if (action === 'copy') {
+          if (start !== end) {
+            const selectedText = val.substring(start, end);
+            smartCopyText(selectedText);
+          }
+        } else if (action === 'paste') {
+          let textToPaste = "";
+          try {
+            const res = await window.pywebview.api.get_clipboard_text();
+            if (res && res.status === 'success') {
+              textToPaste = res.text;
+            }
+          } catch (e) {}
+
+          if (!textToPaste && navigator.clipboard && navigator.clipboard.readText) {
+            try {
+              textToPaste = await navigator.clipboard.readText();
+            } catch (e) {}
+          }
+
+          if (textToPaste) {
+            el.value = val.substring(0, start) + textToPaste + val.substring(end);
+            el.selectionStart = el.selectionEnd = start + textToPaste.length;
+            handleFieldChange();
+          }
+        } else if (action === 'selectall') {
+          el.select();
+        }
+      } else {
+        if (action === 'copy') {
+          const selection = window.getSelection();
+          let selectedText = "";
+          if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+            const container = document.createElement("div");
+            for (let i = 0; i < selection.rangeCount; ++i) {
+              container.appendChild(selection.getRangeAt(i).cloneContents());
+            }
+            selectedText = container.innerText || selection.toString();
+          }
+          const textToCopy = selectedText || el.innerText;
+          smartCopyText(textToCopy);
+        } else if (action === 'selectall') {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+
     async function initSavedSettings() {
       try {
         const settings = await window.pywebview.api.get_settings();
@@ -3452,13 +3774,23 @@ UI_HTML = """
     const lyricsBox = document.getElementById('lyricsContentBox');
     if (lyricsBox) {
       lyricsBox.addEventListener('copy', (e) => {
+        e.preventDefault();
         const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0) return;
-        const selectedText = selection.toString();
-        if (selectedText) {
-          e.clipboardData.setData('text/plain', selectedText);
-          e.preventDefault();
+        let selectedText = "";
+        
+        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+          const container = document.createElement("div");
+          for (let i = 0; i < selection.rangeCount; ++i) {
+            container.appendChild(selection.getRangeAt(i).cloneContents());
+          }
+          selectedText = container.innerText || selection.toString();
         }
+
+        if (!selectedText) {
+          selectedText = lyricsBox.innerText;
+        }
+
+        smartCopyText(selectedText);
       });
     }
     
