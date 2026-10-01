@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="100%" height="100%">
+  <defs>
+    <!-- ایمپورت فونت وزیرمتن -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800&amp;display=swap');
+      text {
+        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        direction: rtl;
+        unicode-bidi: embed;
+      }
+    </style>
+
+    <!-- گرادیان پس‌زمینه اصلی -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f1115" />
+      <stop offset="50%" stop-color="#14171d" />
+      <stop offset="100%" stop-color="#0b0d11" />
+    </linearGradient>
+
+    <!-- درخشش نارنجی پس‌زمینه (نور ملایم سمت راست برای متن) -->
+    <radialGradient id="orange-glow" cx="80%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#ff7700" stop-opacity="0.16" />
+      <stop offset="60%" stop-color="#ff7700" stop-opacity="0.02" />
+      <stop offset="100%" stop-color="#ff7700" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- سایه کارت‌های شیشه‌ای -->
+    <filter id="card-shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+
+    <filter id="modal-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+
+    <!-- رنگ‌ها و المان‌های شیشه‌ای -->
+    <linearGradient id="glass-card" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d222b" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#14181f" stop-opacity="0.9" />
+    </linearGradient>
+
+    <linearGradient id="glass-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03" />
+    </linearGradient>
+
+    <linearGradient id="primary-btn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff8800" />
+      <stop offset="100%" stop-color="#e66000" />
+    </linearGradient>
+  </defs>
+
+  <!-- پس‌زمینه -->
+  <rect width="1200" height="600" fill="url(#bg-grad)" />
+  <rect width="1200" height="600" fill="url(#orange-glow)" />
+
+  <!-- ==================== بخش سمت راست: متن و معرفی (RTL) ==================== -->
+  <g transform="translate(1120, 100)">
+    <!-- نشان ویندوز و نسخه -->
+    <g transform="translate(0, 0)">
+      <rect x="-190" y="0" width="190" height="34" rx="17" fill="#ff7700" fill-opacity="0.08" stroke="#ff7700" stroke-opacity="0.3" stroke-width="1.2" />
+      <!-- آیکون ویندوز -->
+      <path d="M-22 11.5 L-29 12.5 L-29 17 L-22 17 Z M-30.5 12.7 L-38 13.8 L-38 17 L-30.5 17 Z M-22 18.2 L-29 18.2 L-29 22.8 L-22 23.8 Z M-30.5 18.2 L-38 18.2 L-38 21.6 L-30.5 22.6 Z" fill="#ff7700" />
+      <!-- متن نسخه و پلتفرم -->
+      <text x="-44" y="22" font-size="12.5" font-weight="600" fill="#ff9933" text-anchor="start">ویندوز • نسخه ۱.۲.۱</text>
+    </g>
+
+    <!-- عنوان اصلی -->
+    <text x="0" y="105" font-size="46" font-weight="800" fill="#ffffff" text-anchor="start">AudioFlow Studio</text>
+
+    <!-- زیرعنوان فارسی -->
+    <text x="0" y="152" font-size="20" font-weight="600" fill="#ff8800" text-anchor="start">استخراج صدا، مدیریت تگ‌ها و کاورهای چندگانه</text>
+    <text x="0" y="184" font-size="14.5" font-weight="400" fill="#8e97a4" text-anchor="start">تبدیل آسان ویدیو و صوت به MP3 با ویرایشگر متادیتا و ترجمه ترانه</text>
+
+    <!-- ویژگی‌های کلیدی (کپسول‌های تگ) -->
+    <g transform="translate(0, 225)">
+      <!-- تگ ۱ -->
+      <rect x="-195" y="0" width="195" height="42" rx="12" fill="#1b1f27" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1" />
+      <text x="-97" y="26" font-size="13" font-weight="600" fill="#e2e8f0" text-anchor="middle">تبدیل هوشمند به MP3</text>
+
+      <!-- تگ ۲ -->
+      <rect x="-405" y="0" width="195" height="42" rx="12" fill="#1b1f27" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1" />
+      <text x="-307" y="26" font-size="13" font-weight="600" fill="#e2e8f0" text-anchor="middle">کاور چندگانه (Multi-Cover)</text>
+
+      <!-- تگ ۳ -->
+      <rect x="-195" y="54" width="195" height="42" rx="12" fill="#1b1f27" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1" />
+      <text x="-97" y="80" font-size="13" font-weight="600" fill="#e2e8f0" text-anchor="middle">جستجوی متادیتا در وب</text>
+
+      <!-- تگ ۴ -->
+      <rect x="-405" y="54" width="195" height="42" rx="12" fill="#1b1f27" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1" />
+      <text x="-307" y="80" font-size="13" font-weight="600" fill="#e2e8f0" text-anchor="middle">ترجمه خط‌به‌خط ترانه</text>
+    </g>
+
+    <!-- بج‌های کمکی / فرمت‌ها -->
+    <g transform="translate(0, 360)">
+      <rect x="-140" y="0" width="140" height="30" rx="8" fill="#171b22" stroke="#2c3340" stroke-width="1" />
+      <text x="-70" y="19.5" font-size="11.5" font-weight="600" fill="#94a3b8" text-anchor="middle">پشتیبانی از ID3v2.3</text>
+
+      <rect x="-260" y="0" width="110" height="30" rx="8" fill="#7952b3" fill-opacity="0.15" stroke="#7952b3" stroke-opacity="0.4" stroke-width="1" />
+      <text x="-205" y="19.5" font-size="11.5" font-weight="600" fill="#bb99ff" text-anchor="middle">متن‌‌باز و رایگان</text>
+    </g>
+  </g>
+
+  <!-- ==================== بخش سمت چپ: موک‌آپ نرم‌افزار (چیدمان RTL) ==================== -->
+  <g transform="translate(60, 85)">
+    <!-- کارت پشتی (پوسته روشن / کنتراست) -->
+    <rect x="80" y="-15" width="410" height="400" rx="28" fill="#f8fafc" fill-opacity="0.85" filter="url(#card-shadow)" transform="rotate(-3 285 185)" />
+
+    <!-- پنجره اصلی نرم‌افزار -->
+    <rect x="20" y="30" width="440" height="400" rx="24" fill="url(#glass-card)" stroke="url(#glass-border)" stroke-width="1.2" filter="url(#card-shadow)" />
+
+    <!-- نوار پلیر صوتی (تراز شده RTL: دکمه پخش در راست، زمان و امواج در چپ) -->
+    <rect x="42" y="54" width="396" height="52" rx="14" fill="#13171e" fill-opacity="0.8" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+    
+    <!-- دکمه پخش (سمت راست پلیر) -->
+    <circle cx="410" cy="80" r="15" fill="url(#primary-btn)" />
+    <path d="M407 73 L416 80 L407 87 Z" fill="#ffffff" />
+
+    <!-- نوار پیشرفت ترک -->
+    <rect x="110" y="77" width="275" height="6" rx="3" fill="#232936" />
+    <rect x="230" y="77" width="155" height="6" rx="3" fill="url(#primary-btn)" />
+    <circle cx="230" cy="80" r="5" fill="#ffffff" />
+    <!-- زمان موزیک -->
+    <text x="65" y="84" font-size="10" font-weight="600" fill="#707b8c" text-anchor="start">۰۳:۴۲</text>
+
+    <!-- بخش میانی: کاور آلبوم در سمت راست، فیلدهای ورودی در سمت چپ (طبق ساختار RTL) -->
+    <!-- باکس کاور اصلی -->
+    <rect x="288" y="122" width="150" height="150" rx="18" fill="#11141a" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1" />
+    <!-- بج کاور اصلی -->
+    <rect x="365" y="132" width="63" height="18" rx="9" fill="#000000" fill-opacity="0.55" />
+    <text x="396.5" y="144" font-size="8" font-weight="600" fill="#ffffff" text-anchor="middle">کاور اصلی</text>
+
+    <!-- آیکون مرکز کاور -->
+    <g transform="translate(348, 182)" stroke="#3a4454" stroke-width="1.8" fill="none">
+      <rect x="0" y="0" width="30" height="30" rx="6" />
+      <circle cx="9" cy="9" r="3" />
+      <path d="M2 24 L10 16 L18 24 L28 14" />
+    </g>
+
+    <!-- نوارهای کوچک انتخاب کاورهای چندگانه -->
+    <g transform="translate(288, 282)">
+      <rect x="116" y="0" width="34" height="34" rx="8" fill="#181d24" stroke="#ff7700" stroke-width="1.5" />
+      <rect x="76" y="0" width="34" height="34" rx="8" fill="#181d24" stroke="#2c3340" stroke-width="1" />
+      <rect x="36" y="0" width="34" height="34" rx="8" fill="#181d24" stroke="#2c3340" stroke-width="1" />
+      <!-- دکمه افزودن کاور (+) -->
+      <rect x="-4" y="0" width="34" height="34" rx="8" fill="#ff7700" fill-opacity="0.1" stroke="#ff7700" stroke-dasharray="3 3" stroke-width="1" />
+      <path d="M13 11 L13 23 M7 17 L19 17" stroke="#ff7700" stroke-width="1.5" stroke-linecap="round" />
+    </g>
+
+    <!-- فیلدهای متنی سمت چپ (Title, Artist, Album, Year) -->
+    <g transform="translate(42, 122)">
+      <!-- فیلد عنوان -->
+      <rect x="0" y="0" width="232" height="34" rx="9" fill="#12161d" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+      <text x="218" y="21" font-size="10.5" font-weight="600" fill="#475569" text-anchor="start">عنوان اثر (Title)</text>
+
+      <!-- فیلد هنرمند -->
+      <rect x="0" y="44" width="232" height="34" rx="9" fill="#12161d" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+      <text x="218" y="65" font-size="10.5" font-weight="600" fill="#475569" text-anchor="start">هنرمند / خواننده (Artist)</text>
+
+      <!-- دو فیلد دوقلو (آلبوم و سبک) -->
+      <rect x="120" y="88" width="112" height="34" rx="9" fill="#12161d" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+      <text x="218" y="109" font-size="10.5" font-weight="600" fill="#475569" text-anchor="start">آلبوم</text>
+
+      <rect x="0" y="88" width="112" height="34" rx="9" fill="#12161d" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+      <text x="98" y="109" font-size="10.5" font-weight="600" fill="#475569" text-anchor="start">سبک</text>
+
+      <!-- فیلد سال / ناشر -->
+      <rect x="0" y="132" width="232" height="34" rx="9" fill="#12161d" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+      <text x="218" y="153" font-size="10.5" font-weight="600" fill="#475569" text-anchor="start">ناشر و کپی‌رایت</text>
+    </g>
+
+    <!-- دکمه‌های پایین فرم -->
+    <g transform="translate(42, 362)">
+      <!-- دکمه ذخیره اصلی -->
+      <rect x="296" y="0" width="100" height="38" rx="10" fill="url(#primary-btn)" />
+      <text x="346" y="23.5" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">ذخیره تگ‌ها</text>
+
+      <!-- دکمه جستجوی آنلاین -->
+      <rect x="186" y="0" width="102" height="38" rx="10" fill="#1c222b" stroke="#333c4a" stroke-width="1" />
+      <text x="237" y="23" font-size="11" font-weight="600" fill="#cbd5e1" text-anchor="middle">جستجوی آنلاین</text>
+
+      <!-- دکمه ریست / پاکسازی -->
+      <rect x="100" y="0" width="78" height="38" rx="10" fill="#1c222b" stroke="#333c4a" stroke-width="1" />
+      <text x="139" y="23" font-size="11" font-weight="600" fill="#94a3b8" text-anchor="middle">بازنشانی</text>
+    </g>
+
+    <!-- پنجره شناور (Floating Modal): نمایش شعر و ترجمه ترانه -->
+    <g transform="translate(130, 200)" filter="url(#modal-shadow)">
+      <rect x="0" y="0" width="310" height="195" rx="18" fill="#1b2029" stroke="#7952b3" stroke-opacity="0.5" stroke-width="1.2" />
+
+      <!-- هدر مدال -->
+      <rect x="235" y="16" width="60" height="20" rx="6" fill="#7952b3" fill-opacity="0.25" />
+      <text x="265" y="30" font-size="9.5" font-weight="700" fill="#c49eff" text-anchor="middle">متن ترانه</text>
+
+      <rect x="168" y="16" width="60" height="20" rx="6" fill="#ff7700" fill-opacity="0.15" />
+      <text x="198" y="30.5" font-size="9.5" font-weight="700" fill="#ff9933" text-anchor="middle">ترجمه فارسی</text>
+
+      <!-- خطوط متن ترانه و ترجمه متناظر -->
+      <rect x="40" y="55" width="230" height="6" rx="3" fill="#cbd5e1" fill-opacity="0.8" />
+      <rect x="90" y="70" width="180" height="6" rx="3" fill="#ff8800" fill-opacity="0.9" />
+
+      <rect x="60" y="94" width="210" height="6" rx="3" fill="#cbd5e1" fill-opacity="0.8" />
+      <rect x="120" y="109" width="150" height="6" rx="3" fill="#ff8800" fill-opacity="0.9" />
+
+      <rect x="80" y="133" width="190" height="6" rx="3" fill="#cbd5e1" fill-opacity="0.8" />
+      <rect x="130" y="148" width="140" height="6" rx="3" fill="#ff8800" fill-opacity="0.9" />
+
+      <!-- دکمه کپی در فوتر مدال -->
+      <rect x="16" y="162" width="65" height="22" rx="6" fill="#242b38" stroke="#3e485a" stroke-width="0.8" />
+      <text x="48.5" y="177" font-size="9" font-weight="600" fill="#94a3b8" text-anchor="middle">کپی متن</text>
+    </g>
+  </g>
+</svg>
