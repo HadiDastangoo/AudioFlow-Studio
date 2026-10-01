@@ -396,31 +396,9 @@
 
     <g transform="translate(0, 310)">
 
-      <!-- Version -->
-      <rect
-        x="0"
-        y="0"
-        width="84"
-        height="28"
-        rx="6"
-        fill="#ff7700"
-        fill-opacity="0.18"
-      />
-
-      <text
-        x="14"
-        y="19"
-        font-family="'Segoe UI', sans-serif"
-        font-size="12"
-        font-weight="700"
-        fill="#ff7700"
-      >
-        v1.3.0
-      </text>
-
       <!-- Theme -->
       <rect
-        x="94"
+        x="0"
         y="0"
         width="130"
         height="28"
@@ -430,7 +408,7 @@
       />
 
       <text
-        x="106"
+        x="25"
         y="19"
         font-family="'Segoe UI', sans-serif"
         font-size="12"
@@ -442,7 +420,7 @@
 
       <!-- Platform -->
       <rect
-        x="234"
+        x="142"
         y="0"
         width="124"
         height="28"
@@ -452,7 +430,7 @@
       />
 
       <text
-        x="246"
+        x="160"
         y="19"
         font-family="'Segoe UI', sans-serif"
         font-size="12"
