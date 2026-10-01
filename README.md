@@ -14,10 +14,10 @@
 
 <p align="center">
   <a href="#-key-features">Key Features</a> •
-  <a href="[#installation--download]">Download</a> •
-  <a href="#how-to-use">How to Use</a> •
-  <a href="#building-from-source">Build from Source</a> •
-  <a href="#tech-stack">Tech Stack</a>
+  <a href="#-installation--download">Download</a> •
+  <a href="#%EF%B8%8F-how-to-use">How to Use</a> •
+  <a href="#-building-from-source">Build from Source</a> •
+  <a href="#%EF%B8%8F-tech-stack">Tech Stack</a>
 </p>
 
 </div>
@@ -124,3 +124,34 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
+
+### Run
+```Bash
+python app.py
+```
+
+### Build Standalone Executable
+To package the app into a single .exe file on Windows:
+
+```Bash
+pyinstaller --noconsole --onefile --clean --name="AudioFlow-Studio" --icon="icon.ico" --add-data="Vazirmatn.ttf;." --add-data="icon.ico;." app.py
+```
+
+## 🏗️ Tech Stack
+GUI Engine: pywebview powered by Microsoft Edge WebView2.
+
+Tagging Engine: mutagen (ID3v2.3 standard).
+
+Media Processing: imageio-ffmpeg / FFmpeg.
+
+Image Processing: Pillow (PIL).
+
+Frontend: Vanilla HTML5, Modern CSS3 (Glassmorphism), ES6+ JavaScript.
+
+APIs: Apple iTunes Search API, LRCLIB API, MyMemory Translation API.
+
+Typography: Vazirmatn (offline base64 injected).
+
+## 📄 License
+This project is licensed under the MIT License. See the LICENSE file for more information.
