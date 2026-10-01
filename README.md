@@ -9,6 +9,8 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)](https://github.com/HadiDastangoo/AudioFlow-Studio/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
 
+<img src="assets/banner.svg" alt="AudioFlow Studio" width="100%">
+
 <p align="center">
   <a href="#-key-features">Key Features</a> •
   <a href="#-screenshots">Screenshots</a> •
