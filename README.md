@@ -9,11 +9,9 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)](https://github.com/HadiDastangoo/AudioFlow-Studio/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
 
-<!-- [PLACEHOLDER: Add App Banner / Main Interface Screenshot Here] -->
-<img src="assets/banner.svg" alt="AudioFlow Studio Preview" width="100%">
-
 <p align="center">
   <a href="#-key-features">Key Features</a> •
+  <a href="#-screenshots">Screenshots</a> •
   <a href="#-installation--download">Download</a> •
   <a href="#%EF%B8%8F-how-to-use">How to Use</a> •
   <a href="#-building-from-source">Build from Source</a> •
@@ -43,9 +41,6 @@
 * Built-in interactive **1:1 square cropper** with zoom and pan controls.
 * High-resolution cover art fetching, direct clipboard copying, and cover image saving.
 
-<!-- [PLACEHOLDER: Add Multi-Cover Strip & Cropper Modal Screenshot Here] -->
-<!-- Example: ![Multi-Cover Interface](assets/screenshot-covers.png) -->
-
 ### 🏷️ Comprehensive Metadata & Extended Tags
 * Standard tags: `Title`, `Artist`, `Album`, `Genre`, `Composer`, `Year`, `Track #`, `Disc #`, `Copyright`, `Comment`.
 * **Extended ID3v2 Tags:** Collapsible accordion for `Publisher / Label (TPUB)`, `Mood (TMOO)`, `BPM (TBPM)`, `Original Artist (TOPE)`, `ISRC (TSRC)`, and `Unsynchronized Lyrics (USLT)`.
@@ -57,9 +52,6 @@
 * Grid and List layout toggles with detailed metadata previews.
 * One-click action buttons to apply tags, artwork, or both.
 
-<!-- [PLACEHOLDER: Add Online Search Results Modal Screenshot Here] -->
-<!-- Example: ![Online Search Results](assets/screenshot-search.png) -->
-
 ### 📜 Lyrics Viewer, Translation & Paragraph Formatting
 * Automated lyrics fetching via **LRCLIB**.
 * Built-in paragraph translation powered by **MyMemory API** with rate-limit chunking.
@@ -68,9 +60,6 @@
   * `Translation`: Display clean translated text.
   * `Original + Translation`: Synchronized, line-by-line bilingual alignment.
 * Windows CRLF (`\r\n`) line break normalization ensures formatted text is preserved across external text editors.
-
-<!-- [PLACEHOLDER: Add Lyrics Modal Screenshot Here] -->
-<!-- Example: ![Lyrics Viewer](assets/screenshot-lyrics.png) -->
 
 ### 🎛️ Modern Built-in Audio Player
 * Embedded HTML5 audio player designed for desktop playback without WebView file protocol security blocks.
@@ -81,6 +70,13 @@
 * Adaptive themes: **System Default**, **Light**, and **Dark** modes.
 * Persistent user preferences saved locally in `config.json`.
 * Built-in GitHub update checker displaying download size and changelogs.
+
+---
+
+## 📸 Screenshots
+  | Main | Lyrics & Translation | Dark & Light |
+  | :---: | :---: | :---: |
+  | <img src="assets/en/main_full_en.png" width="380"> | <img src="assets/en/lyrics_en.png" width="380"><br /><br /><img src="assets/en/translation_en.png" width="380"> | <img src="assets/en/dark_en.png" width="380"><br /><br /><img src="assets/en/light_en.png" width="380"> |
 
 ---
 
