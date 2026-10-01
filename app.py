@@ -20,7 +20,7 @@ from mutagen.mp3 import MP3
 
 # ----------------- متغیرهای سراسری برنامه -----------------
 APP_NAME = "AudioFlow Studio"
-APP_VERSION = "v1.2.1"
+APP_VERSION = "v1.3.0"
 GITHUB_REPO = "HadiDastangoo/AudioFlow-Studio"
 # --------------------------------------------------------
 
@@ -38,7 +38,6 @@ APIC_TYPES = {
 }
 
 def get_embedded_font_css():
-    """خوانش فونت وزیرمتن محلی و تبدیل به Base64 برای استقلال کامل و یکسانی ظاهر در همه سیستم‌ها"""
     base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.argv[0])))
     font_candidates = ["Vazirmatn.woff2", "Vazirmatn-Regular.woff2", "Vazirmatn.ttf", "vazirmatn.woff2", "vazirmatn.ttf"]
     
@@ -115,7 +114,6 @@ class MusicTaggerAPI:
             return {"status": "error", "message": str(e)}
 
     def get_clipboard_text(self):
-        """دریافت تضمینی متن کلیپ‌بورد از طریق پایتون برای رفع محدودیت امنیتی موتور وب‌ویو"""
         try:
             import win32clipboard
             win32clipboard.OpenClipboard()
@@ -134,7 +132,6 @@ class MusicTaggerAPI:
                 return {"status": "error", "text": "", "message": str(e)}
 
     def copy_text_to_clipboard(self, text):
-        """کپی تضمینی متن چندخطی با کاراکترهای شکست خط ویندوز (CRLF) در کلیپ‌بورد سیستم"""
         if text is None:
             return {"status": "error", "message": "Text is None"}
         try:
@@ -213,7 +210,7 @@ class MusicTaggerAPI:
         result = self._window.create_file_dialog(
             dialog_type,
             allow_multiple=False,
-            file_types=('Media Files (*.mp4;*.mp3;*.m4a;*.wav;*.mkv;*.flv;*.aac)', 'All Files (*.*)')
+            file_types=('Media Files (*.mp4;*.mp3;*.m4a;*.wav;*.mkv;*.flv;*.aac;*.flac)', 'All Files (*.*)')
         )
         if result and len(result) > 0:
             return self.process_selected_file(result[0])
@@ -475,7 +472,6 @@ class MusicTaggerAPI:
             return {"status": "not_found"}
 
     def translate_lyrics(self, lyrics_text, target_lang="fa"):
-        """ترجمه بند به بند و خط به خط با سرویس پایدار MyMemory و رفع انتیتی‌های خط جدید"""
         if not self.is_online():
             return {"status": "no_internet"}
         if not lyrics_text or not lyrics_text.strip():
@@ -715,11 +711,6 @@ UI_HTML = """
     --modal-bg: #1e232b;
     --cover-bg: #16191f;
     --accent-purple-light: rgba(121, 82, 179, 0.2);
-    --player-bg: rgba(255, 255, 255, 0.9);
-    --player-border: #dce2e8;
-  }
-
-  body.theme-dark {
     --player-bg: rgba(25, 30, 38, 0.9);
     --player-border: rgba(255, 255, 255, 0.1);
   }
@@ -1846,8 +1837,8 @@ UI_HTML = """
   <div class="container">
     <div class="drop-zone" id="dropZone" onclick="handleSelectFile()">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-      <div style="font-weight: 600; font-size: 1.05rem;" data-i18n="dropText">Drop audio or video files here (MP4, MP3, ...) or browse</div>
-      <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;" data-i18n="dropSubtext">Automatic online search, modern tag editor and full media player</div>
+      <div style="font-weight: 600; font-size: 1.05rem;" data-i18n="dropText">Drop audio or video files here or browse</div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6;" data-i18n="dropSubtext">Supported: MP3 (Edit directly) • FLAC, MP4, M4A, WAV, AAC, MKV, FLV (Convert & Edit)</div>
     </div>
 
     <div class="loaded-filename-bar" id="loadedFilenameBar">
@@ -2351,8 +2342,8 @@ UI_HTML = """
     const translations = {
       en: {
         btnAbout: "About",
-        dropText: "Drop audio or video files here (MP4, MP3, ...) or browse",
-        dropSubtext: "Automatic online search, modern tag editor and full media player",
+        dropText: "Drop audio or video files here or browse",
+        dropSubtext: "Supported: MP3 (Edit directly) • FLAC, MP4, M4A, WAV, AAC, MKV, FLV (Convert & Edit)",
         lblCurrentFile: "Current File:",
         nonMp3Notice: "This is not an MP3 file; convert to MP3 to edit tags.",
         btnConvert: "Convert to MP3",
@@ -2440,8 +2431,8 @@ UI_HTML = """
       },
       fa: {
         btnAbout: "درباره برنامه",
-        dropText: "فایل صوتی یا تصویری (MP4, MP3, ...) را اینجا بکشید یا کلیک کنید",
-        dropSubtext: "ویرایشگر تمامی تگ‌های ID3، پشتیبانی از کاورهای چندگانه و پلیر مدرن",
+        dropText: "فایل صوتی یا تصویری را اینجا بکشید یا برای انتخاب کلیک کنید",
+        dropSubtext: "فرمت‌های پشتیبانی‌شده: MP3 (ویرایش مستقیم) • FLAC, MP4, M4A, WAV, AAC, MKV, FLV (تبدیل و ویرایش)",
         lblCurrentFile: "فایل بارگذاری‌شده:",
         nonMp3Notice: "این فایل MP3 نیست؛ برای ویرایش تگ‌ها تبدیل به MP3 الزامی است.",
         btnConvert: "تبدیل به MP3",
@@ -3265,7 +3256,6 @@ UI_HTML = """
       } catch (err) {}
 
       if (!copiedViaPython) {
-        // تبدیل امن خطوط بدون نیاز به عبارات منظم خطرساز درون پایتون
         const normalized = text.split('\\r\\n').join('\\n').split('\\r').join('\\n').split('\\n').join('\\r\\n');
         if (navigator.clipboard && window.isSecureContext) {
           try {
@@ -3508,7 +3498,7 @@ UI_HTML = """
     async function openSettingsModal() {
       const settings = await window.pywebview.api.get_settings();
       document.getElementById('settingOverwrite').checked = settings.overwrite_original;
-      document.getElementById('settingPathDisplay').value = settings.custom_output_dir || (currentLang === 'fa' ? "کنار فایل اصلی (پیش‌فرض)" : "Same directory as source");
+      document.getElementById('settingPathDisplay').value = settings.custom_output_dir || (currentLang === 'fa' ? "کنار فایل اصلی (پیش‌‌فرض)" : "Same directory as source");
       document.getElementById('settingLanguage').value = settings.language || "en";
       document.getElementById('settingTheme').value = settings.theme || "system";
       document.getElementById('settingsModal').style.display = 'flex';
