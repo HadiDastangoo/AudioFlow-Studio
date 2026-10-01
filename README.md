@@ -13,8 +13,8 @@
 <img src="assets/banner.svg" alt="AudioFlow Studio Preview" width="100%">
 
 <p align="center">
-  <a href="#key-features">Key Features</a> •
-  <a href="#installation--download">Download</a> •
+  <a href="#-key-features">Key Features</a> •
+  <a href="[#installation--download]">Download</a> •
   <a href="#how-to-use">How to Use</a> •
   <a href="#building-from-source">Build from Source</a> •
   <a href="#tech-stack">Tech Stack</a>
