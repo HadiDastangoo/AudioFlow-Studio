@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="#-%D9%88%DB%8C%DA%98%DA%AF%DB%8C%E2%80%8C%D9%87%D8%A7%DB%8C-%DA%A9%D9%84%DB%8C%D8%AF%DB%8C">ویژگی‌های کلیدی</a> •
-  <a href="#-%D9%88%DB%8C%DA%98%DA%AF%DB%8C%E2%80%8C%D9%87%D8%A7%DB%8C-%DA%A9%D9%84%DB%8C%D8%AF%DB%8C">تصاویر</a> •
+  <a href="#-%D8%AA%D8%B5%D8%A7%D9%88%DB%8C%D8%B1">تصاویر</a> •
   <a href="#-%D9%86%D8%B5%D8%A8-%D9%88-%D8%AF%D8%B1%DB%8C%D8%A7%D9%81%D8%AA">نصب و دانلود</a> •
   <a href="#%EF%B8%8F-%D8%B1%D8%A7%D9%87%D9%86%D9%85%D8%A7%DB%8C-%D8%A7%D8%B3%D8%AA%D9%81%D8%A7%D8%AF%D9%87">راهنمای استفاده</a> •
   <a href="#-%D8%A7%D8%AC%D8%B1%D8%A7-%D8%A7%D8%B2-%D8%B3%D9%88%D8%B1%D8%B3%E2%80%8C%DA%A9%D8%AF">اجرا از سورس‌کد</a> •
@@ -76,9 +76,9 @@
 ---
 
 ## 📸 تصاویر
-  | پنجره اصلی | ترانه و ترجمه | شب و روز |
+  | حالت شب و روز | ترانه و ترجمه | پنجره اصلی |
   | :---: | :---: | :---: |
-  | <img src="assets/fa/main_full_fa.png" width="380"> | <img src="assets/fa/lyrics_fa.png" width="380"><br /><br /><img src="assets/fa/translation_fa.png" width="380"> | <img src="assets/fa/dark_fa.png" width="380"><br /><br /><img src="assets/fa/light_fa.png" width="380"> |
+  | <img src="assets/fa/dark_fa.png" width="380"><br /><br /><img src="assets/fa/light_fa.png" width="380"> | <img src="assets/fa/lyrics_fa.png" width="380"><br /><br /><img src="assets/fa/translation_fa.png" width="380"> | <img src="assets/fa/main_full_fa.png" width="380"> |
 
 ---
 
