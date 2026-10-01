@@ -17,7 +17,8 @@
   <a href="#-installation--download">Download</a> •
   <a href="#%EF%B8%8F-how-to-use">How to Use</a> •
   <a href="#-building-from-source">Build from Source</a> •
-  <a href="#%EF%B8%8F-tech-stack">Tech Stack</a>
+  <a href="#%EF%B8%8F-tech-stack">Tech Stack</a> •
+  <a href="README_fa.md">فارسی</a>
 </p>
 
 </div>
