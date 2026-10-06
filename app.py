@@ -20,7 +20,7 @@ from mutagen.mp3 import MP3
 
 # ----------------- Global Variables -----------------
 APP_NAME = "AudioFlow Studio"
-APP_VERSION = "v1.3.0"
+APP_VERSION = "v1.3.1"
 GITHUB_REPO = "HadiDastangoo/AudioFlow-Studio"
 # --------------------------------------------------------
 
