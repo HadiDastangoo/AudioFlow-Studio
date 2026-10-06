@@ -162,7 +162,7 @@ const translations = {
     chkDeleteCovers: "حذف تمامی کاورها و تصاویر فایل صوتی",
     btnConfirmClear: "پاکسازی تمام تگ‌ها",
     chooseCoverTypeTitle: "انتخاب نوع کاور جدید",
-    chooseCoverTypeDesc: "نوع تصویری که می‌خواهید به فایل صوتی اضافه کنید را انتخاب کنید:",
+    chooseCoverTypeDesc: "نوع تصویری که می‌‌خواهید به فایل صوتی اضافه کنید را انتخاب کنید:",
     btnContinue: "ادامه و انتخاب فایل",
     onlineMatches: "نتایج هوشمند آنلاین (تا ۱۰ مورد مشابه)",
     detailsTitle: "جزئیات انتشار آهنگ",
@@ -219,30 +219,25 @@ const translations = {
 };
 
 let currentLang = "en";
-
 let appRepoUrl = "https://github.com/HadiDastangoo/AudioFlow-Studio";
 
 async function initAppInfo() {
   try {
     const info = await window.pywebview.api.get_app_info();
     if (info) {
-      // تنظیم متون هدر
       const headerTitle = document.getElementById('appHeaderTitle');
       const headerVersion = document.getElementById('appHeaderVersion');
       if (headerTitle) headerTitle.innerText = info.name;
       if (headerVersion) headerVersion.innerText = info.version;
 
-      // تنظیم متون مدال About
       const aboutName = document.getElementById('aboutAppName');
       const aboutVer = document.getElementById('aboutAppVersion');
       if (aboutName) aboutName.innerText = info.name;
       if (aboutVer) aboutVer.innerText = info.version;
 
-      // تنظیم نسخه در بخش تنظیمات/بروزرسانی
       const currentVerText = document.getElementById('txtCurrentVersion');
       if (currentVerText) currentVerText.innerText = info.version;
 
-      // ذخیره لینک گیت‌هاب
       if (info.repo_url) appRepoUrl = info.repo_url;
     }
   } catch (err) {
@@ -1228,7 +1223,7 @@ async function saveTags() {
 async function openSettingsModal() {
   const settings = await window.pywebview.api.get_settings();
   document.getElementById('settingOverwrite').checked = settings.overwrite_original;
-  document.getElementById('settingPathDisplay').value = settings.custom_output_dir || (currentLang === 'fa' ? "کنار فایل اصلی (پیش‌‌‌‌فرض)" : "Same directory as source");
+  document.getElementById('settingPathDisplay').value = settings.custom_output_dir || (currentLang === 'fa' ? "کنار فایل اصلی (پیش‌فرض)" : "Same directory as source");
   document.getElementById('settingLanguage').value = settings.language || "en";
   document.getElementById('settingTheme').value = settings.theme || "system";
   document.getElementById('settingsModal').style.display = 'flex';
@@ -1250,7 +1245,7 @@ async function saveSettingsModal() {
   const theme = document.getElementById('settingTheme').value;
   const newSettings = {
     overwrite_original: document.getElementById('settingOverwrite').checked,
-    custom_output_dir: (document.getElementById('settingPathDisplay').value.includes("Same") || document.getElementById('settingPathDisplay').value.includes("پیش‌فرض")) ? "" : document.getElementById('settingPathDisplay').value,
+    custom_output_dir: (document.getElementById('settingPathDisplay').value.includes("Same") || document.getElementById('settingPathDisplay').value.includes("پیش‌‌فرض")) ? "" : document.getElementById('settingPathDisplay').value,
     language: lang,
     theme: theme
   };
@@ -1485,13 +1480,25 @@ async function initSavedSettings() {
   }, 1500);
 }
 
-window.addEventListener('pywebviewready', async () => {
+let isAppBootstrapped = false;
+
+async function bootstrapApp() {
+  if (isAppBootstrapped) return;
+  if (!window.pywebview || !window.pywebview.api) return;
+
+  isAppBootstrapped = true;
   await initAppInfo();
   await initSavedSettings();
-});
+}
+
+window.addEventListener('pywebviewready', bootstrapApp);
 
 window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(initSavedSettings, 200);
+  setTimeout(() => {
+    if (!isAppBootstrapped && window.pywebview && window.pywebview.api) {
+      bootstrapApp();
+    }
+  }, 250);
 });
 
 const lyricsBox = document.getElementById('lyricsContentBox');
