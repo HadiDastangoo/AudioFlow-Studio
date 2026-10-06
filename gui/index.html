@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <title>AudioFlow Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-system">
+
+  <header>
+    <div class="app-brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+      </div>
+      <span id="appHeaderTitle">AudioFlow Studio</span>
+      <span class="app-version-badge" id="appHeaderVersion">v1.3.0</span>
+    </div>
+    
+    <div class="header-actions">
+      <button class="icon-btn" id="btnSettingsIcon" title="Settings" onclick="openSettingsModal()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span class="update-badge" id="settingsUpdateBadge"></span>
+      </button>
+      <button class="about-btn" onclick="openAboutModal()" data-i18n="btnAbout">About</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="drop-zone" id="dropZone" onclick="handleSelectFile()">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+      <div style="font-weight: 600; font-size: 1.05rem;" data-i18n="dropText">Drop audio or video files here or browse</div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6;" data-i18n="dropSubtext">Supported: MP3 (Edit directly) • FLAC, MP4, M4A, WAV, AAC, MKV, FLV (Convert & Edit)</div>
+    </div>
+
+    <div class="loaded-filename-bar" id="loadedFilenameBar">
+      <div class="loaded-filename-inner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span style="font-size: 0.85rem; color: var(--text-muted);" data-i18n="lblCurrentFile">Current File:</span>
+        <span class="loaded-filename-text" id="displayLoadedFilename">---</span>
+      </div>
+      <button class="copy-btn" id="btnCopyFilename" title="Copy Filename" onclick="copyCurrentFilename(this)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      </button>
+    </div>
+
+    <div class="conversion-banner" id="conversionBanner">
+      <div>
+        <strong id="nonMp3Name">File name</strong>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;" data-i18n="nonMp3Notice">This is not an MP3 file; convert to MP3 to edit tags.</p>
+      </div>
+      <button class="btn btn-primary" id="btnConvert" onclick="convertCurrentFile()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span data-i18n="btnConvert">Convert to MP3</span>
+      </button>
+    </div>
+
+    <div class="editor-grid" id="editorGrid">
+      <div class="left-panel">
+        <div class="cover-box-container">
+          <div class="cover-card" id="coverCard">
+            <span class="cover-type-tag" id="coverTypeBadge">Front Cover (Main)</span>
+            <img id="coverImage" src="" alt="Album Cover" style="display: none;">
+            
+            <div class="cover-placeholder" id="coverPlaceholder" onclick="triggerAddCover(3)">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#a0a8b4" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              <span data-i18n="chooseCover">Choose Album Cover</span>
+            </div>
+
+            <div class="cover-overlay" id="coverOverlay">
+              <button class="cover-action-circle-btn" title="Change & Crop" onclick="triggerEditCurrentCover()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              </button>
+              <button class="cover-action-circle-btn btn-delete" title="Delete Cover" onclick="deleteCurrentCover()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="covers-thumbnails-strip" id="coversThumbsStrip"></div>
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="custom-audio-player" id="customAudioPlayer">
+          <audio id="audioElement" preload="auto"></audio>
+          <button class="player-play-btn" id="playerPlayBtn" onclick="togglePlayAudio()">
+            <svg id="playBtnIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          </button>
+          
+          <div class="player-timeline-box">
+            <div class="player-progress-bar-wrap" id="playerProgressWrap" onclick="seekAudio(event)">
+              <div class="player-progress-current" id="playerProgressFill"></div>
+            </div>
+            <div class="player-time-display">
+              <span id="playerCurrentTime">00:00</span>
+              <span id="playerTotalTime">00:00</span>
+            </div>
+          </div>
+
+          <div class="player-vol-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <input type="range" class="player-vol-slider" min="0" max="1" step="0.05" value="1" oninput="changeVolume(this.value)">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="lblTitle">Title</label>
+            <input type="text" class="form-control input-tag-field" id="inputTitle" oninput="handleFieldChange()">
+          </div>
+          <div class="form-group">
+            <label data-i18n="lblArtist">Artist</label>
+            <input type="text" class="form-control input-tag-field" id="inputArtist" oninput="handleFieldChange()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="lblAlbum">Album</label>
+            <input type="text" class="form-control input-tag-field" id="inputAlbum" oninput="handleFieldChange()">
+          </div>
+          <div class="form-group">
+            <label data-i18n="lblGenre">Genre</label>
+            <input type="text" class="form-control input-tag-field" id="inputGenre" oninput="handleFieldChange()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="lblComposer">Composer</label>
+            <input type="text" class="form-control input-tag-field" id="inputComposer" oninput="handleFieldChange()">
+          </div>
+          <div class="form-group">
+            <label data-i18n="lblYear">Year</label>
+            <input type="text" class="form-control input-tag-field" id="inputYear" oninput="handleFieldChange()">
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="form-group">
+            <label data-i18n="lblTrack">Track #</label>
+            <input type="text" class="form-control input-tag-field" id="inputTrack" oninput="handleFieldChange()">
+          </div>
+          <div class="form-group">
+            <label data-i18n="lblDisc">Disc #</label>
+            <input type="text" class="form-control input-tag-field" id="inputDisc" oninput="handleFieldChange()">
+          </div>
+          <div class="form-group">
+            <label data-i18n="lblCopyright">Copyright</label>
+            <input type="text" class="form-control input-tag-field" id="inputCopyright" oninput="handleFieldChange()">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label data-i18n="lblComment">Comment</label>
+          <input type="text" class="form-control input-tag-field" id="inputComment" oninput="handleFieldChange()">
+        </div>
+
+        <div class="extended-tags-accordion">
+          <div class="extended-accordion-header" id="accordionToggleBtn" onclick="toggleExtendedTagsAccordion()">
+            <span data-i18n="lblOtherTags">Extended / Other Tags (Publisher, Lyrics, Mood, ...)</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="extended-accordion-body" id="accordionBody">
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="lblPublisher">Publisher / Label</label>
+                <input type="text" class="form-control input-tag-field" id="inputPublisher" oninput="handleFieldChange()">
+              </div>
+              <div class="form-group">
+                <label data-i18n="lblMood">Mood</label>
+                <input type="text" class="form-control input-tag-field" id="inputMood" oninput="handleFieldChange()">
+              </div>
+            </div>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+              <div class="form-group">
+                <label data-i18n="lblBpm">BPM</label>
+                <input type="text" class="form-control input-tag-field" id="inputBpm" oninput="handleFieldChange()">
+              </div>
+              <div class="form-group">
+                <label data-i18n="lblOrigArtist">Original Artist</label>
+                <input type="text" class="form-control input-tag-field" id="inputOriginalArtist" oninput="handleFieldChange()">
+              </div>
+              <div class="form-group">
+                <label data-i18n="lblIsrc">ISRC</label>
+                <input type="text" class="form-control input-tag-field" id="inputIsrc" oninput="handleFieldChange()">
+              </div>
+            </div>
+            <div class="form-group">
+              <label data-i18n="lblLyrics">Unsynchronized Lyrics</label>
+              <textarea class="form-control input-tag-field" id="inputLyrics" rows="4" style="resize: vertical;" oninput="handleFieldChange()"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-outline" id="btnOnlineSearch" disabled onclick="searchOnline()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span id="txtOnlineSearch" data-i18n="btnSearchOnline">Search Online Metadata</span>
+          </button>
+
+          <div class="action-buttons-group">
+            <button class="btn btn-danger" id="btnClearAll" onclick="openClearAllModal()" title="Clear All Tags">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span data-i18n="btnClearAll">Clear All</span>
+            </button>
+
+            <button class="btn btn-secondary" id="btnReset" onclick="promptResetTags()">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+              <span data-i18n="btnReset">Reset</span>
+            </button>
+
+            <button class="btn btn-primary" id="btnSave" disabled onclick="saveTags()">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              <span data-i18n="btnSave">Save Tags</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="online-results-section" id="onlineSection">
+      <div class="online-header-bar">
+        <div class="online-header">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          <span data-i18n="onlineMatches">Online Matches (Up to 10 releases)</span>
+        </div>
+        
+        <div class="view-toggles">
+          <button class="icon-btn active" id="btnViewGrid" title="Grid View" onclick="setViewMode('grid')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          </button>
+          <button class="icon-btn" id="btnViewList" title="List View" onclick="setViewMode('list')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="results-grid view-grid" id="resultsGrid"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="coverTypeModal">
+    <div class="modal-dialog" style="width: 440px;">
+      <h3 style="font-weight: 700; font-size: 1.15rem;" data-i18n="chooseCoverTypeTitle">Select Cover Type</h3>
+      <p style="font-size: 0.88rem; color: var(--text-muted);" data-i18n="chooseCoverTypeDesc">Select the image type you want to add to this audio file:</p>
+      
+      <div class="form-group">
+        <select class="form-control" id="selectNewCoverType"></select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+        <button class="btn btn-outline" onclick="closeCoverTypeModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" onclick="proceedToPickCoverFile()" data-i18n="btnContinue">Continue & Browse</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="clearAllModal">
+    <div class="modal-dialog" style="width: 460px;">
+      <h3 style="font-weight: 700; font-size: 1.15rem; color: #d9534f;" data-i18n="clearAllModalTitle">Clear All Tags</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.6;" data-i18n="clearAllModalDesc">
+        All metadata fields in this file will be cleared. Are you sure you want to proceed?
+      </p>
+      
+      <div class="settings-option" style="border: none; padding-bottom: 0;">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkDeleteCovers">
+          <span style="color: #d9534f; font-weight: 600;" data-i18n="chkDeleteCovers">Also remove all embedded covers</span>
+        </label>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+        <button class="btn btn-outline" onclick="closeClearAllModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" style="background: #d9534f;" onclick="performClearAllTags()" data-i18n="btnConfirmClear">Clear Tags</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="detailModal">
+    <div class="modal-dialog">
+      <h3 style="font-weight: 700; font-size: 1.15rem;" data-i18n="detailsTitle">Release Details</h3>
+      <div class="detail-modal-body">
+        <div class="detail-cover-wrapper" onclick="openLightbox(document.getElementById('detailCoverImg').src)">
+          <img id="detailCoverImg" src="" alt="Cover">
+          <div class="detail-cover-actions" onclick="event.stopPropagation()">
+            <button class="img-action-btn" title="Save image" onclick="saveCoverToFile()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            </button>
+            <button class="img-action-btn" title="Copy image" onclick="copyImageToClipboard()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-fields-list" id="detailFieldsList"></div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+        <button class="btn btn-outline" onclick="closeDetailModal()" data-i18n="btnClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="lyricsModal">
+    <div class="modal-dialog" style="width: 680px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-weight: 700; font-size: 1.15rem; color: var(--accent-purple);" id="lyricsModalTitle">Song Lyrics</h3>
+        <button class="icon-btn" id="btnCopyAllLyrics" title="Copy Lyrics" onclick="copyLyricsText(this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+      </div>
+
+      <div class="lyrics-toolbar">
+        <div class="lyrics-tabs">
+          <button class="lyrics-tab-btn active" id="tabLyricsOrig" onclick="switchLyricsTab('original')" data-i18n="tabOriginal">Original</button>
+          <button class="lyrics-tab-btn" id="tabLyricsTrans" onclick="switchLyricsTab('translated')" data-i18n="tabTranslated">Translation</button>
+          <button class="lyrics-tab-btn" id="tabLyricsCombined" onclick="switchLyricsTab('combined')" data-i18n="tabCombined">Original + Translation</button>
+        </div>
+
+        <div class="lyrics-trans-controls">
+          <select class="lyrics-trans-select" id="selectLyricsLang">
+            <option value="fa">فارسی (FA)</option>
+            <option value="en">English (EN)</option>
+          </select>
+          <button class="btn-sm" id="btnDoTranslate" onclick="translateCurrentLyrics()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            <span data-i18n="btnTranslate">Translate</span>
+          </button>
+        </div>
+      </div>
+
+      <pre class="lyrics-content-box" id="lyricsContentBox"></pre>
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+        <button class="btn btn-outline" onclick="applyLyricsToComment()" data-i18n="btnApplyLyricsToComment">Set as Track Comment & Lyrics</button>
+        <button class="btn btn-primary" onclick="closeLyricsModal()" data-i18n="btnClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lightbox-modal" id="lightboxModal" onclick="closeLightbox()">
+    <img id="lightboxImg" src="" alt="Enlarged Cover">
+  </div>
+
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-dialog">
+      <h3 style="font-weight: 700; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span data-i18n="settingsTitle">Preferences & Storage</span>
+      </h3>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="lblLanguage">Language</label>
+          <select class="form-control" id="settingLanguage">
+            <option value="en">English</option>
+            <option value="fa">فارسی</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-i18n="lblTheme">Theme</label>
+          <select class="form-control" id="settingTheme">
+            <option value="system" data-i18n="themeSystem">System Default</option>
+            <option value="light" data-i18n="themeLight">Light</option>
+            <option value="dark" data-i18n="themeDark">Dark</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="settings-option">
+        <label class="checkbox-label">
+          <input type="checkbox" id="settingOverwrite">
+          <span data-i18n="overwriteNotice">Overwrite original file (If unchecked, saves as new file)</span>
+        </label>
+      </div>
+
+      <div class="settings-option" style="border: none;">
+        <label style="font-size: 0.88rem; font-weight: 600;" data-i18n="lblOutputDir">Output folder path:</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" class="form-control" id="settingPathDisplay" readonly placeholder="Same directory as source" style="flex: 1;">
+          <button class="btn btn-outline" onclick="browseOutputDir()" data-i18n="btnBrowse">Browse</button>
+        </div>
+      </div>
+
+      <div class="update-section-box">
+        <div class="update-status-row">
+          <div class="update-info-text">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span data-i18n="lblAppUpdate">Software Update:</span>
+            <span style="font-weight: 600;" id="txtCurrentVersion">v1.3.0</span>
+          </div>
+          <button class="btn btn-sm btn-outline" id="btnManualCheckUpdate" onclick="manualCheckForUpdates()">
+            <span data-i18n="btnCheckUpdate">Check for Updates</span>
+          </button>
+        </div>
+        <div class="update-last-checked" id="txtLastCheckedTime">Last checked: Never</div>
+        
+        <div class="update-found-banner" id="updateFoundBanner">
+          <div class="update-banner-header">
+            <div>
+              <strong id="updateFoundTitle">New version available!</strong>
+              <span class="update-size-badge" id="updateFileSizeBadge"></span>
+            </div>
+            <button class="btn-download-update" id="btnDownloadUpdate" onclick="downloadLatestRelease()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span data-i18n="btnDownload">Download</span>
+            </button>
+          </div>
+          <div class="update-notes-scrollbox" id="updateReleaseNotesBox" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+        <button class="btn btn-outline" onclick="closeSettingsModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSettingsModal()" data-i18n="btnSaveAndClose">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="confirmResetModal">
+    <div class="modal-dialog" style="width: 440px;">
+      <h3 style="font-weight: 700; font-size: 1.1rem; color: #d9534f;" data-i18n="resetConfirmTitle">Reset Warning</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.6;" data-i18n="resetConfirmDesc">
+        Unsaved changes detected. Are you sure you want to discard them and revert to initial tags?
+      </p>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-outline" onclick="closeConfirmResetModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" style="background: #d9534f;" onclick="performResetTags()" data-i18n="btnConfirmReset">Yes, Revert</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="cropModal">
+    <div class="modal-dialog">
+      <h3 style="font-weight: 700; font-size: 1.1rem;" data-i18n="cropTitle">Square Crop Cover</h3>
+      <div class="crop-offline-box">
+        <canvas id="cropCanvas" width="340" height="340"></canvas>
+      </div>
+      <div class="crop-controls">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Zoom</span>
+        <input type="range" id="cropZoomSlider" min="1" max="3" step="0.05" value="1" oninput="updateCropTransform()">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button class="btn btn-outline" onclick="closeCropModal()" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" onclick="applyCrop()" data-i18n="btnApplyCrop">Apply 1:1 Crop</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="coverFileInput" accept="image/*" style="display: none;" onchange="handleCoverFileSelected(event)">
+
+  <div class="modal-backdrop" id="aboutModal">
+    <div class="modal-dialog" style="text-align: center; gap: 14px;">
+      <div class="brand-icon" style="margin: 0 auto; width: 48px; height: 48px;">
+        <svg width="28" height="28" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+      </div>
+      <h3 style="font-weight: 700;" id="aboutAppName">AudioFlow Studio</h3>
+      <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-top: -8px;" id="aboutAppVersion">v1.3.0</span>
+      <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.7;" data-i18n="aboutDesc">
+        Modern MP4 to MP3 converter & intelligent ID3 tag batch editor.
+      </p>
+      <div style="background: var(--primary-light); padding: 14px; border-radius: 12px;">
+        <span style="font-weight: 600; color: var(--primary); font-size: 1.05rem;" data-i18n="aboutDev">Developer: Hadi Dastangoo</span>
+        <div style="font-size: 0.8rem; color: #888; margin-top: 4px;">AI Programming Partner: Google Gemini</div>
+      </div>
+      <button class="btn btn-outline" style="align-self: center; margin-top: 6px;" onclick="closeAboutModal()" data-i18n="btnClose">Close</button>
+    </div>
+  </div>
+
+  <div class="custom-context-menu" id="inputContextMenu">
+    <div class="context-menu-item" id="ctxItemCut" onclick="execContextMenuAction('cut')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+      <span data-i18n="ctxCut">Cut</span>
+    </div>
+    <div class="context-menu-item" id="ctxItemCopy" onclick="execContextMenuAction('copy')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      <span data-i18n="ctxCopy">Copy</span>
+    </div>
+    <div class="context-menu-item" id="ctxItemPaste" onclick="execContextMenuAction('paste')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+      <span data-i18n="ctxPaste">Paste</span>
+    </div>
+    <div class="context-menu-divider" id="ctxDivider"></div>
+    <div class="context-menu-item" id="ctxItemSelectAll" onclick="execContextMenuAction('selectall')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+      <span data-i18n="ctxSelectAll">Select All</span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
