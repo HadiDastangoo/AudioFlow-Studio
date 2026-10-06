@@ -1484,7 +1484,7 @@ let isAppBootstrapped = false;
 
 async function bootstrapApp() {
   if (isAppBootstrapped) return;
-  if (!window.pywebview || !window.pywebview.api) return;
+  if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_app_info) return;
 
   isAppBootstrapped = true;
   await initAppInfo();
@@ -1493,13 +1493,18 @@ async function bootstrapApp() {
 
 window.addEventListener('pywebviewready', bootstrapApp);
 
-window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    if (!isAppBootstrapped && window.pywebview && window.pywebview.api) {
-      bootstrapApp();
+window.addEventListener('DOMContentLoaded', bootstrapApp);
+
+const bootstrapInterval = setInterval(() => {
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.get_app_info) {
+    bootstrapApp();
+    if (isAppBootstrapped) {
+      clearInterval(bootstrapInterval);
     }
-  }, 250);
-});
+  }
+}, 50);
+
+setTimeout(() => clearInterval(bootstrapInterval), 5000);
 
 const lyricsBox = document.getElementById('lyricsContentBox');
 if (lyricsBox) {
