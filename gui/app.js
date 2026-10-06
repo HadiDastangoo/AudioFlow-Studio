@@ -220,6 +220,41 @@ const translations = {
 
 let currentLang = "en";
 
+let appRepoUrl = "https://github.com/HadiDastangoo/AudioFlow-Studio";
+
+async function initAppInfo() {
+  try {
+    const info = await window.pywebview.api.get_app_info();
+    if (info) {
+      // تنظیم متون هدر
+      const headerTitle = document.getElementById('appHeaderTitle');
+      const headerVersion = document.getElementById('appHeaderVersion');
+      if (headerTitle) headerTitle.innerText = info.name;
+      if (headerVersion) headerVersion.innerText = info.version;
+
+      // تنظیم متون مدال About
+      const aboutName = document.getElementById('aboutAppName');
+      const aboutVer = document.getElementById('aboutAppVersion');
+      if (aboutName) aboutName.innerText = info.name;
+      if (aboutVer) aboutVer.innerText = info.version;
+
+      // تنظیم نسخه در بخش تنظیمات/بروزرسانی
+      const currentVerText = document.getElementById('txtCurrentVersion');
+      if (currentVerText) currentVerText.innerText = info.version;
+
+      // ذخیره لینک گیت‌هاب
+      if (info.repo_url) appRepoUrl = info.repo_url;
+    }
+  } catch (err) {
+    console.error("Failed to load app info:", err);
+  }
+}
+
+function openGithubRepo() {
+  window.pywebview.api.open_external_url(appRepoUrl);
+}
+
+
 function applyLanguage(lang) {
   currentLang = lang;
   document.documentElement.lang = lang;
@@ -1451,7 +1486,10 @@ async function initSavedSettings() {
   }, 1500);
 }
 
-window.addEventListener('pywebviewready', initSavedSettings);
+window.addEventListener('pywebviewready', async () => {
+  await initAppInfo();
+  await initSavedSettings();
+});
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(initSavedSettings, 200);
 });
