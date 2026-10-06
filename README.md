@@ -126,15 +126,19 @@ pip install -r requirements.txt
 ```
 
 ### Run
-```Bash
+```bash
 python app.py
 ```
 
 ### Build Standalone Executable
 To package the app into a single .exe file on Windows:
 
-```Bash
-pyinstaller --noconsole --onefile --clean --name="AudioFlow-Studio" --icon="icon.ico" --add-data="Vazirmatn.ttf;." --add-data="icon.ico;." app.py
+```bash
+pyinstaller --noconsole --onefile --clean `
+  --name="AudioFlow-Studio" `
+  --icon="gui/icon.ico" `
+  --add-data="gui;gui" `
+  app.py
 ```
 
 ## 🏗️ Tech Stack
