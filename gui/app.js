@@ -254,7 +254,6 @@ function openGithubRepo() {
   window.pywebview.api.open_external_url(appRepoUrl);
 }
 
-
 function applyLanguage(lang) {
   currentLang = lang;
   document.documentElement.lang = lang;
@@ -1490,6 +1489,7 @@ window.addEventListener('pywebviewready', async () => {
   await initAppInfo();
   await initSavedSettings();
 });
+
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(initSavedSettings, 200);
 });
