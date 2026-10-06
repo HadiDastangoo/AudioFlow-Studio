@@ -18,7 +18,7 @@ from mutagen.id3 import (
 )
 from mutagen.mp3 import MP3
 
-# ----------------- متغیرهای سراسری برنامه -----------------
+# ----------------- Global Variables -----------------
 APP_NAME = "AudioFlow Studio"
 APP_VERSION = "v1.3.0"
 GITHUB_REPO = "HadiDastangoo/AudioFlow-Studio"
@@ -38,7 +38,6 @@ APIC_TYPES = {
 }
 
 def get_resource_path(relative_path):
-    """مدیریت مسیرها برای محیط اجرای محلی و خروجی بیلد PyInstaller"""
     base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_dir, relative_path)
 
@@ -306,6 +305,13 @@ class MusicTaggerAPI:
             }
         except Exception as e:
             return {"status": "error", "message": f"Error converting file: {str(e)}"}
+
+    def get_app_info(self):
+        return {
+            "name": APP_NAME,
+            "version": APP_VERSION,
+            "repo_url": f"https://github.com/{GITHUB_REPO}"
+        }
 
     def _get_audio_data_url(self, file_path):
         try:
