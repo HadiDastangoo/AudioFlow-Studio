@@ -133,7 +133,11 @@ python app.py
 جهت بسته‌بندی برنامه در قالب یک فایل اجرایی واحد بدون نیاز به نصب پایتون:
 
 ```bash
-pyinstaller --noconsole --onefile --clean --name="AudioFlow-Studio-v1.2.1" --icon="icon.ico" --add-data="Vazirmatn.ttf;." --add-data="icon.ico;." app.py
+pyinstaller --noconsole --onefile --clean `
+  --name="AudioFlow-Studio" `
+  --icon="gui/icon.ico" `
+  --add-data="gui;gui" `
+  app.py
 ```
 
 ## 🏗️ پشته فنی (Tech Stack)
