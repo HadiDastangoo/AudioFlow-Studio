@@ -1295,8 +1295,14 @@ async function checkAppUpdates(isManual = false) {
   const bannerTitle = document.getElementById('updateFoundTitle');
   const sizeBadge = document.getElementById('updateFileSizeBadge');
   const notesBox = document.getElementById('updateReleaseNotesBox');
+  const currentVerText = document.getElementById('txtCurrentVersion');
 
   if (res && res.status === 'success') {
+    // تضمین نمایش قطعی نسخه کنونی گزارش‌شده از بک‌اند
+    if (res.current_version && currentVerText) {
+      currentVerText.innerText = res.current_version;
+    }
+
     if (res.has_update) {
       badge.style.display = 'block';
       banner.style.display = 'flex';
